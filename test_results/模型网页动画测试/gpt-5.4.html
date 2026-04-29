@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Analog Clock 10:10</title>
+  <style>
+    :root {
+      --clock-size: min(78vmin, 520px);
+      --face-border: max(0.7vmin, 5px);
+      --mark-color: #1f2937;
+      --face-color: #ffffff;
+      --rim-color: #111827;
+      --accent: #dc2626;
+      --hour-color: #111827;
+      --minute-color: #374151;
+      --shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+      --font: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      height: 100%;
+      margin: 0;
+      background: #ffffff;
+      font-family: var(--font);
+    }
+
+    body {
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+
+    .clock {
+      position: relative;
+      width: var(--clock-size);
+      aspect-ratio: 1;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at center, #fff 0 64%, transparent 64.2%),
+        radial-gradient(circle at center, #f9fafb 0 100%);
+      border: var(--face-border) solid var(--rim-color);
+      box-shadow: var(--shadow);
+    }
+
+    .clock::before {
+      content: "";
+      position: absolute;
+      inset: 3.2%;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at center, rgba(0,0,0,0.02), transparent 58%),
+        #fff;
+      z-index: 0;
+    }
+
+    .ticks {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      z-index: 1;
+    }
+
+    .tick {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 0.65%;
+      height: 47%;
+      transform-origin: 50% 100%;
+      border-radius: 999px;
+      transform: translate(-50%, -100%) rotate(calc(var(--i) * 6deg));
+      pointer-events: none;
+    }
+
+    .tick::before {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 0;
+      transform: translateX(-50%);
+      width: var(--w, 100%);
+      height: var(--h, 7.5%);
+      border-radius: 999px;
+      background: var(--mark-color);
+      opacity: var(--o, 0.85);
+    }
+
+    .tick.major {
+      width: 1%;
+      --h: 12%;
+      --w: 100%;
+      --o: 1;
+    }
+
+    .numerals {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      z-index: 2;
+      color: #111827;
+      font-weight: 600;
+      font-size: clamp(14px, 3.1vmin, 28px);
+    }
+
+    .numeral {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 2.4em;
+      height: 2.4em;
+      margin: -1.2em;
+      display: grid;
+      place-items: center;
+      transform:
+        rotate(calc(var(--n) * 30deg))
+        translateY(calc(var(--clock-size) * -0.36))
+        rotate(calc(var(--n) * -30deg));
+      user-select: none;
+    }
+
+    .hands {
+      position: absolute;
+      inset: 0;
+      z-index: 3;
+    }
+
+    .hand {
+      position: absolute;
+      left: 50%;
+      bottom: 50%;
+      transform-origin: 50% 100%;
+      border-radius: 999px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+    }
+
+    .hour {
+      width: max(1.6vmin, 8px);
+      height: 24%;
+      background: var(--hour-color);
+      transform: translateX(-50%) rotate(305deg);
+    }
+
+    .minute {
+      width: max(1vmin, 5px);
+      height: 34%;
+      background: var(--minute-color);
+      transform: translateX(-50%) rotate(60deg);
+    }
+
+    .second {
+      width: max(0.34vmin, 2px);
+      height: 39%;
+      background: var(--accent);
+      transform: translateX(-50%) rotate(0deg);
+      animation: sweep 60s linear infinite;
+    }
+
+    .second::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      bottom: -14%;
+      transform: translateX(-50%);
+      width: 220%;
+      height: 18%;
+      border-radius: 999px;
+      background: var(--accent);
+    }
+
+    .center {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 4.8%;
+      aspect-ratio: 1;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      background: var(--rim-color);
+      z-index: 4;
+      box-shadow: 0 0 0 max(0.45vmin, 3px) #fff, 0 0 0 max(0.7vmin, 5px) var(--rim-color);
+    }
+
+    .center::after {
+      content: "";
+      position: absolute;
+      inset: 26%;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+
+    @keyframes sweep {
+      from { transform: translateX(-50%) rotate(0deg); }
+      to   { transform: translateX(-50%) rotate(360deg); }
+    }
+
+    @media (max-width: 420px) {
+      :root {
+        --clock-size: min(88vmin, 420px);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="clock" aria-label="Analog clock showing 10:10">
+    <div class="ticks">
+      <span class="tick major" style="--i:0"></span>
+      <span class="tick" style="--i:1"></span>
+      <span class="tick" style="--i:2"></span>
+      <span class="tick" style="--i:3"></span>
+      <span class="tick" style="--i:4"></span>
+      <span class="tick major" style="--i:5"></span>
+      <span class="tick" style="--i:6"></span>
+      <span class="tick" style="--i:7"></span>
+      <span class="tick" style="--i:8"></span>
+      <span class="tick" style="--i:9"></span>
+      <span class="tick major" style="--i:10"></span>
+      <span class="tick" style="--i:11"></span>
+      <span class="tick" style="--i:12"></span>
+      <span class="tick" style="--i:13"></span>
+      <span class="tick" style="--i:14"></span>
+      <span class="tick major" style="--i:15"></span>
+      <span class="tick" style="--i:16"></span>
+      <span class="tick" style="--i:17"></span>
+      <span class="tick" style="--i:18"></span>
+      <span class="tick" style="--i:19"></span>
+      <span class="tick major" style="--i:20"></span>
+      <span class="tick" style="--i:21"></span>
+      <span class="tick" style="--i:22"></span>
+      <span class="tick" style="--i:23"></span>
+      <span class="tick" style="--i:24"></span>
+      <span class="tick major" style="--i:25"></span>
+      <span class="tick" style="--i:26"></span>
+      <span class="tick" style="--i:27"></span>
+      <span class="tick" style="--i:28"></span>
+      <span class="tick" style="--i:29"></span>
+      <span class="tick major" style="--i:30"></span>
+      <span class="tick" style="--i:31"></span>
+      <span class="tick" style="--i:32"></span>
+      <span class="tick" style="--i:33"></span>
+      <span class="tick" style="--i:34"></span>
+      <span class="tick major" style="--i:35"></span>
+      <span class="tick" style="--i:36"></span>
+      <span class="tick" style="--i:37"></span>
+      <span class="tick" style="--i:38"></span>
+      <span class="tick" style="--i:39"></span>
+      <span class="tick major" style="--i:40"></span>
+      <span class="tick" style="--i:41"></span>
+      <span class="tick" style="--i:42"></span>
+      <span class="tick" style="--i:43"></span>
+      <span class="tick" style="--i:44"></span>
+      <span class="tick major" style="--i:45"></span>
+      <span class="tick" style="--i:46"></span>
+      <span class="tick" style="--i:47"></span>
+      <span class="tick" style="--i:48"></span>
+      <span class="tick" style="--i:49"></span>
+      <span class="tick major" style="--i:50"></span>
+      <span class="tick" style="--i:51"></span>
+      <span class="tick" style="--i:52"></span>
+      <span class="tick" style="--i:53"></span>
+      <span class="tick" style="--i:54"></span>
+      <span class="tick major" style="--i:55"></span>
+      <span class="tick" style="--i:56"></span>
+      <span class="tick" style="--i:57"></span>
+      <span class="tick" style="--i:58"></span>
+      <span class="tick" style="--i:59"></span>
+    </div>
+
+    <div class="numerals" aria-hidden="true">
+      <span class="numeral" style="--n:1">1</span>
+      <span class="numeral" style="--n:2">2</span>
+      <span class="numeral" style="--n:3">3</span>
+      <span class="numeral" style="--n:4">4</span>
+      <span class="numeral" style="--n:5">5</span>
+      <span class="numeral" style="--n:6">6</span>
+      <span class="numeral" style="--n:7">7</span>
+      <span class="numeral" style="--n:8">8</span>
+      <span class="numeral" style="--n:9">9</span>
+      <span class="numeral" style="--n:10">10</span>
+      <span class="numeral" style="--n:11">11</span>
+      <span class="numeral" style="--n:12">12</span>
+    </div>
+
+    <div class="hands">
+      <div class="hand hour"></div>
+      <div class="hand minute"></div>
+      <div class="hand second"></div>
+    </div>
+
+    <div class="center"></div>
+  </div>
+</body>
+</html>

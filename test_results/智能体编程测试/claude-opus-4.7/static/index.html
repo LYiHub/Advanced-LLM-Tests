@@ -1,0 +1,1073 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>多角色权限计算器</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #1e293b;
+      --panel-2: #273449;
+      --border: #334155;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --accent: #3b82f6;
+      --accent-hover: #2563eb;
+      --danger: #ef4444;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --op: #f59e0b;
+      --op-hover: #d97706;
+      --num: #334155;
+      --num-hover: #475569;
+      --fn: #64748b;
+      --fn-hover: #94a3b8;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                   "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 1024px;
+      margin: 0 auto;
+      padding: 24px 16px 48px;
+    }
+    h1 { margin: 0 0 8px; font-size: 22px; }
+    h2 { font-size: 16px; color: var(--muted); margin: 0 0 12px; }
+    h3 { font-size: 15px; margin: 0 0 8px; }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+
+    .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .spacer { flex: 1; }
+
+    input[type="text"], input[type="password"], input[type="number"], select {
+      background: var(--panel-2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-size: 14px;
+      min-width: 0;
+    }
+    input:focus, select:focus { outline: 1px solid var(--accent); }
+
+    button {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 8px 14px;
+      font-size: 14px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    button:hover:not(:disabled) { background: var(--accent-hover); }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    button.secondary { background: #475569; }
+    button.secondary:hover:not(:disabled) { background: #64748b; }
+    button.danger { background: var(--danger); }
+    button.danger:hover:not(:disabled) { background: #dc2626; }
+    button.warning { background: var(--warning); color: #1f2937; }
+    button.warning:hover:not(:disabled) { background: #d97706; color: #fff; }
+    button.success { background: var(--success); }
+    button.success:hover:not(:disabled) { background: #059669; }
+
+    .tag {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      background: #334155;
+    }
+    .tag.guest { background: #475569; }
+    .tag.member { background: #0369a1; }
+    .tag.admin { background: #b45309; }
+    .tag.superadmin { background: #7c3aed; }
+    .tag.banned { background: var(--danger); }
+
+    /* ===== Calculator ===== */
+
+    .calc-layout {
+      display: grid;
+      grid-template-columns: minmax(280px, 360px) 1fr;
+      gap: 20px;
+    }
+    @media (max-width: 820px) {
+      .calc-layout { grid-template-columns: 1fr; }
+    }
+
+    .calculator {
+      background: #0b1220;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+      user-select: none;
+    }
+
+    .calc-screen {
+      background: #05080f;
+      border: 1px solid #1e293b;
+      border-radius: 10px;
+      padding: 14px 16px;
+      margin-bottom: 14px;
+      min-height: 92px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      align-items: flex-end;
+      font-family: "SF Mono", Consolas, Menlo, monospace;
+    }
+    .calc-expr {
+      color: var(--muted);
+      font-size: 14px;
+      min-height: 20px;
+      word-break: break-all;
+      text-align: right;
+      line-height: 1.3;
+    }
+    .calc-main {
+      color: var(--text);
+      font-size: 34px;
+      font-weight: 300;
+      margin-top: 6px;
+      word-break: break-all;
+      text-align: right;
+      line-height: 1.1;
+      max-width: 100%;
+      overflow-wrap: anywhere;
+    }
+    .calc-main.error { color: var(--danger); font-size: 20px; }
+
+    .calc-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+    .calc-btn {
+      background: var(--num);
+      color: var(--text);
+      border: none;
+      border-radius: 10px;
+      padding: 0;
+      height: 56px;
+      font-size: 22px;
+      font-weight: 400;
+      cursor: pointer;
+      transition: background .1s, transform .05s;
+    }
+    .calc-btn:hover:not(:disabled) { background: var(--num-hover); }
+    .calc-btn:active:not(:disabled) { transform: scale(0.96); }
+    .calc-btn:disabled {
+      opacity: 0.25;
+      cursor: not-allowed;
+      background: var(--num);
+    }
+    .calc-btn.fn { background: var(--fn); }
+    .calc-btn.fn:hover:not(:disabled) { background: var(--fn-hover); color: #0b1220; }
+    .calc-btn.op {
+      background: var(--op);
+      color: #1f2937;
+      font-weight: 600;
+    }
+    .calc-btn.op:hover:not(:disabled) { background: var(--op-hover); color: #fff; }
+    .calc-btn.op.active {
+      background: #fff;
+      color: var(--op);
+    }
+    .calc-btn.equals {
+      background: var(--accent);
+      color: #fff;
+    }
+    .calc-btn.equals:hover:not(:disabled) { background: var(--accent-hover); }
+    .calc-btn.zero { grid-column: span 2; }
+
+    .calc-locked {
+      font-size: 10px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+    .calc-btn .locked-label {
+      display: block;
+      font-size: 10px;
+      color: #fca5a5;
+      margin-top: 2px;
+    }
+
+    .calc-side {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .role-hint {
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .role-hint strong { color: var(--text); }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+    th, td {
+      text-align: left;
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    th { color: var(--muted); font-weight: 500; }
+    tr:last-child td { border-bottom: none; }
+
+    .err {
+      background: rgba(239, 68, 68, 0.15);
+      color: #fca5a5;
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 13px;
+      margin-bottom: 10px;
+    }
+    .ok {
+      background: rgba(16, 185, 129, 0.15);
+      color: #6ee7b7;
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 13px;
+      margin-bottom: 10px;
+    }
+    .hidden { display: none !important; }
+
+    .tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .tab {
+      padding: 8px 14px;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      color: var(--muted);
+      user-select: none;
+    }
+    .tab.active {
+      color: var(--text);
+      border-bottom-color: var(--accent);
+    }
+
+    .auth-card { max-width: 420px; margin: 80px auto 0; }
+    .auth-card input { width: 100%; margin-bottom: 10px; }
+    .auth-card button { width: 100%; padding: 10px; font-size: 15px; }
+
+    .small { font-size: 12px; color: var(--muted); }
+    .muted { color: var(--muted); }
+
+    .user-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+
+    .rule-form {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr auto 1fr auto;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    @media (max-width: 640px) {
+      .rule-form {
+        grid-template-columns: 1fr 1fr;
+      }
+      .rule-form > button { grid-column: span 2; }
+    }
+
+    kbd {
+      background: #111827;
+      border: 1px solid #334155;
+      border-radius: 4px;
+      padding: 1px 6px;
+      font-size: 11px;
+      font-family: "SF Mono", Consolas, Menlo, monospace;
+      color: var(--text);
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ==================== Auth View ==================== -->
+  <div id="auth-view">
+    <div class="card auth-card">
+      <h1>多角色权限计算器</h1>
+      <div class="tabs">
+        <div class="tab active" id="tab-login">登录</div>
+        <div class="tab" id="tab-register">注册</div>
+      </div>
+      <div id="auth-err" class="err hidden"></div>
+      <input type="text" id="auth-username" placeholder="用户名" autocomplete="username" />
+      <input type="password" id="auth-password" placeholder="密码" autocomplete="current-password" />
+      <button id="auth-submit">登录</button>
+      <p class="small">默认超级管理员：root / root123</p>
+    </div>
+  </div>
+
+  <!-- ==================== App View ==================== -->
+  <div id="app-view" class="hidden">
+
+    <div class="user-bar">
+      <h1 style="margin:0;">多角色权限计算器</h1>
+      <div class="spacer"></div>
+      <span>欢迎，<strong id="ub-name"></strong></span>
+      <span class="tag" id="ub-role"></span>
+      <button class="secondary" id="btn-logout">登出</button>
+    </div>
+
+    <!-- ========== Calculator Card ========== -->
+    <div class="card">
+      <div class="calc-layout">
+        <!-- LEFT: real calculator -->
+        <div class="calculator" tabindex="0" id="calc-root">
+          <div class="calc-screen">
+            <div class="calc-expr" id="calc-expr">&nbsp;</div>
+            <div class="calc-main" id="calc-main">0</div>
+          </div>
+          <div class="calc-grid" id="calc-grid">
+            <!-- populated by JS -->
+          </div>
+        </div>
+
+        <!-- RIGHT: role hint + history -->
+        <div class="calc-side">
+          <div class="role-hint">
+            当前角色：<strong id="calc-role"></strong><br>
+            可用运算：<strong id="calc-allowed"></strong><br>
+            <span class="small">
+              键盘支持：数字键、<kbd>+</kbd><kbd>-</kbd><kbd>*</kbd><kbd>/</kbd>、
+              <kbd>Enter</kbd>/<kbd>=</kbd> 计算、
+              <kbd>Backspace</kbd> 退格、<kbd>Esc</kbd> 清除、<kbd>.</kbd> 小数点
+            </span>
+          </div>
+          <div>
+            <h3 style="display:flex;align-items:center;">
+              最近 10 条历史
+              <button class="secondary" id="btn-refresh-history"
+                      style="margin-left:auto;padding:4px 10px;font-size:12px;">刷新</button>
+            </h3>
+            <table id="history-table">
+              <thead><tr><th>表达式</th><th>结果</th><th>时间</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Admin Panel -->
+    <div class="card hidden" id="admin-card">
+      <h3>管理面板</h3>
+      <div id="admin-msg" class="ok hidden"></div>
+      <table id="users-table">
+        <thead>
+          <tr><th>ID</th><th>用户名</th><th>角色</th><th>状态</th><th>操作</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <!-- Rule Tampering (superadmin only) -->
+    <div class="card hidden" id="rules-card">
+      <h3>规则篡改面板（仅本次服务生效）</h3>
+      <div id="rules-msg" class="hidden"></div>
+      <div class="rule-form">
+        <input type="text" id="rule-a" placeholder="A" />
+        <select id="rule-op">
+          <option value="+">+</option>
+          <option value="-">-</option>
+          <option value="*">×</option>
+          <option value="/">÷</option>
+        </select>
+        <input type="text" id="rule-b" placeholder="B" />
+        <span>=</span>
+        <input type="text" id="rule-result" placeholder="覆盖结果" />
+        <button id="btn-add-rule" class="warning">添加规则</button>
+      </div>
+      <table id="rules-table">
+        <thead><tr><th>表达式</th><th>真实结果应为</th><th>被篡改为</th><th>操作</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ====================================================================
+// Helpers
+// ====================================================================
+const $ = (id) => document.getElementById(id);
+const show = (el) => el.classList.remove("hidden");
+const hide = (el) => el.classList.add("hidden");
+
+const OP_DISPLAY = { "+": "+", "-": "−", "*": "×", "/": "÷" };
+function dispOp(op) { return OP_DISPLAY[op] || op; }
+
+function showErr(elId, msg) {
+  const el = $(elId);
+  el.textContent = msg;
+  el.className = "err";
+  show(el);
+  clearTimeout(el._t);
+  el._t = setTimeout(() => hide(el), 4000);
+}
+function showOk(elId, msg) {
+  const el = $(elId);
+  el.textContent = msg;
+  el.className = "ok";
+  show(el);
+  clearTimeout(el._t);
+  el._t = setTimeout(() => hide(el), 2500);
+}
+
+async function api(path, method, body) {
+  const opts = { method, credentials: "same-origin", headers: {} };
+  if (body !== undefined) {
+    opts.headers["Content-Type"] = "application/json";
+    opts.body = JSON.stringify(body);
+  }
+  let resp, data;
+  try {
+    resp = await fetch(path, opts);
+    data = await resp.json();
+  } catch (e) {
+    throw new Error("网络错误：" + e.message);
+  }
+  if (!resp.ok || !data.ok) {
+    throw new Error(data && data.error ? data.error : "请求失败 (" + resp.status + ")");
+  }
+  return data;
+}
+
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+// ====================================================================
+// Global state
+// ====================================================================
+let currentUser = null;
+
+// ====================================================================
+// Auth view
+// ====================================================================
+let authMode = "login";
+
+$("tab-login").onclick = () => setAuthMode("login");
+$("tab-register").onclick = () => setAuthMode("register");
+
+function setAuthMode(mode) {
+  authMode = mode;
+  $("tab-login").classList.toggle("active", mode === "login");
+  $("tab-register").classList.toggle("active", mode === "register");
+  $("auth-submit").textContent = mode === "login" ? "登录" : "注册";
+  hide($("auth-err"));
+}
+
+$("auth-submit").onclick = async () => {
+  const username = $("auth-username").value.trim();
+  const password = $("auth-password").value;
+  hide($("auth-err"));
+  if (!username || !password) {
+    showErr("auth-err", "用户名和密码不能为空");
+    return;
+  }
+  try {
+    if (authMode === "login") {
+      const data = await api("/api/login", "POST", { username, password });
+      currentUser = data.user;
+      enterApp();
+    } else {
+      await api("/api/register", "POST", { username, password });
+      const data = await api("/api/login", "POST", { username, password });
+      currentUser = data.user;
+      enterApp();
+    }
+  } catch (e) {
+    showErr("auth-err", e.message);
+  }
+};
+for (const id of ["auth-username", "auth-password"]) {
+  $(id).addEventListener("keydown", (ev) => {
+    if (ev.key === "Enter") $("auth-submit").click();
+  });
+}
+
+// ====================================================================
+// Enter app
+// ====================================================================
+function enterApp() {
+  hide($("auth-view"));
+  show($("app-view"));
+  $("ub-name").textContent = currentUser.username;
+  const tag = $("ub-role");
+  tag.textContent = currentUser.role;
+  tag.className = "tag " + currentUser.role;
+
+  $("calc-role").textContent = currentUser.role;
+  $("calc-allowed").textContent =
+    currentUser.allowed_ops.map(dispOp).join("  ");
+
+  buildCalculator();
+  resetCalc();
+
+  if (currentUser.can_manage) show($("admin-card")); else hide($("admin-card"));
+  if (currentUser.can_tamper) show($("rules-card")); else hide($("rules-card"));
+
+  refreshHistory();
+  if (currentUser.can_manage) refreshUsers();
+  if (currentUser.can_tamper) refreshOverrides();
+
+  // focus calculator so keyboard works immediately
+  $("calc-root").focus();
+}
+
+// ====================================================================
+// Calculator: layout + state machine
+// ====================================================================
+// State:
+//   current   - string being edited, always a valid number-ish string
+//   previous  - left-hand operand (number) or null
+//   operator  - pending operator ("+"|"-"|"*"|"/") or null
+//   justEvaluated - true right after "=" so next digit starts fresh
+//   errorMode - true if last compute errored; any number clears it
+//
+// Chain semantics: pressing an operator while `previous` and `current`
+// both exist AND no fresh `=` just happened will evaluate left-to-right.
+//
+// Every evaluation goes to the backend (authority + override honoring).
+
+const calcState = {
+  current: "0",
+  previous: null,
+  operator: null,
+  justEvaluated: false,
+  errorMode: false,
+  busy: false,
+};
+
+// Button layout. Each entry: [label, kind, value?]
+// kind: "num", "op", "fn" (functional like AC/DEL/±/.), "eq"
+// For ops we render disabled if role lacks permission.
+const BUTTONS = [
+  ["AC",   "fn",  "ac"],
+  ["DEL",  "fn",  "del"],
+  ["±",    "fn",  "sign"],
+  ["÷",    "op",  "/"],
+
+  ["7",    "num", "7"],
+  ["8",    "num", "8"],
+  ["9",    "num", "9"],
+  ["×",    "op",  "*"],
+
+  ["4",    "num", "4"],
+  ["5",    "num", "5"],
+  ["6",    "num", "6"],
+  ["−",    "op",  "-"],
+
+  ["1",    "num", "1"],
+  ["2",    "num", "2"],
+  ["3",    "num", "3"],
+  ["+",    "op",  "+"],
+
+  ["0",    "num", "0", "zero"], // spans 2
+  [".",    "fn",  "dot"],
+  ["=",    "eq",  "="],
+];
+
+function buildCalculator() {
+  const grid = $("calc-grid");
+  grid.innerHTML = "";
+  const allowed = new Set(currentUser.allowed_ops);
+
+  for (const b of BUTTONS) {
+    const [label, kind, value, extra] = b;
+    const btn = document.createElement("button");
+    btn.className = "calc-btn";
+    if (kind === "num") btn.classList.add("num");
+    if (kind === "op")  btn.classList.add("op");
+    if (kind === "fn")  btn.classList.add("fn");
+    if (kind === "eq")  btn.classList.add("equals");
+    if (extra === "zero") btn.classList.add("zero");
+    btn.dataset.kind = kind;
+    btn.dataset.value = value;
+
+    // Role gating: ops must be in allowed list
+    if (kind === "op" && !allowed.has(value)) {
+      btn.disabled = true;
+      btn.title = "当前角色无权使用该运算";
+      btn.innerHTML = label + '<span class="locked-label">无权限</span>';
+    } else {
+      btn.textContent = label;
+    }
+
+    btn.onclick = () => handleButton(kind, value);
+    grid.appendChild(btn);
+  }
+}
+
+function resetCalc() {
+  calcState.current = "0";
+  calcState.previous = null;
+  calcState.operator = null;
+  calcState.justEvaluated = false;
+  calcState.errorMode = false;
+  renderCalc();
+}
+
+function renderCalc() {
+  const main = $("calc-main");
+  const expr = $("calc-expr");
+  main.classList.toggle("error", calcState.errorMode);
+  main.textContent = calcState.current;
+
+  if (calcState.previous !== null && calcState.operator) {
+    expr.textContent =
+      formatNum(calcState.previous) + " " + dispOp(calcState.operator);
+  } else {
+    expr.innerHTML = "&nbsp;";
+  }
+
+  // Highlight active operator
+  document.querySelectorAll(".calc-btn.op").forEach((btn) => {
+    btn.classList.toggle(
+      "active",
+      !calcState.justEvaluated &&
+      calcState.operator === btn.dataset.value &&
+      calcState.previous !== null &&
+      calcState.current === "0" // visually only when waiting for rhs; harmless
+        ? true
+        : calcState.operator === btn.dataset.value && calcState.previous !== null && !calcState.justEvaluated
+    );
+  });
+}
+
+function formatNum(n) {
+  if (typeof n === "string") return n;
+  if (Number.isInteger(n)) return String(n);
+  // Trim noisy floats
+  let s = n.toString();
+  if (s.includes("e")) return s;
+  if (s.includes(".")) s = s.replace(/0+$/, "").replace(/\.$/, "");
+  return s;
+}
+
+// ---------- input handlers ----------
+
+function handleButton(kind, value) {
+  if (calcState.busy) return;
+
+  if (kind === "num") return inputDigit(value);
+  if (kind === "fn") {
+    if (value === "ac") return resetCalc();
+    if (value === "del") return inputDel();
+    if (value === "sign") return inputSign();
+    if (value === "dot") return inputDot();
+  }
+  if (kind === "op") return inputOperator(value);
+  if (kind === "eq") return inputEquals();
+}
+
+function clearErrorIfAny() {
+  if (calcState.errorMode) {
+    calcState.current = "0";
+    calcState.errorMode = false;
+  }
+}
+
+function inputDigit(d) {
+  clearErrorIfAny();
+  if (calcState.justEvaluated) {
+    // typing a digit after = starts a new calc
+    calcState.previous = null;
+    calcState.operator = null;
+    calcState.current = d;
+    calcState.justEvaluated = false;
+  } else if (calcState.current === "0") {
+    calcState.current = d;
+  } else if (calcState.current === "-0") {
+    calcState.current = "-" + d;
+  } else {
+    if (calcState.current.replace("-", "").replace(".", "").length >= 15) return;
+    calcState.current += d;
+  }
+  renderCalc();
+}
+
+function inputDot() {
+  clearErrorIfAny();
+  if (calcState.justEvaluated) {
+    calcState.previous = null;
+    calcState.operator = null;
+    calcState.current = "0.";
+    calcState.justEvaluated = false;
+  } else if (!calcState.current.includes(".")) {
+    calcState.current += ".";
+  }
+  renderCalc();
+}
+
+function inputDel() {
+  clearErrorIfAny();
+  if (calcState.justEvaluated) {
+    // DEL after = clears result to 0
+    calcState.current = "0";
+    calcState.justEvaluated = false;
+    renderCalc();
+    return;
+  }
+  let s = calcState.current;
+  if (s.length <= 1 || (s.length === 2 && s.startsWith("-"))) {
+    calcState.current = "0";
+  } else {
+    calcState.current = s.slice(0, -1);
+  }
+  renderCalc();
+}
+
+function inputSign() {
+  clearErrorIfAny();
+  if (calcState.current === "0") return;
+  if (calcState.current.startsWith("-")) {
+    calcState.current = calcState.current.slice(1);
+  } else {
+    calcState.current = "-" + calcState.current;
+  }
+  calcState.justEvaluated = false;
+  renderCalc();
+}
+
+async function inputOperator(op) {
+  if (!currentUser.allowed_ops.includes(op)) {
+    showCalcError("当前角色无权使用该运算");
+    return;
+  }
+  clearErrorIfAny();
+
+  // If there's a pending op AND the user already typed a new rhs → chain eval
+  if (
+    calcState.previous !== null &&
+    calcState.operator !== null &&
+    !calcState.justEvaluated &&
+    calcState.current !== ""
+  ) {
+    const ok = await evaluate(false);
+    if (!ok) return;
+  }
+
+  // Stash current as previous, queue the new operator
+  calcState.previous = parseFloat(calcState.current);
+  calcState.operator = op;
+  calcState.justEvaluated = false;
+  calcState.current = "0"; // placeholder; first digit will replace
+  // BUT: we want "typing a digit replaces 0" which inputDigit already does.
+  renderCalc();
+}
+
+async function inputEquals() {
+  if (calcState.operator === null || calcState.previous === null) return;
+  await evaluate(true);
+}
+
+async function evaluate(isFinal) {
+  if (calcState.busy) return false;
+  if (calcState.current === "" || calcState.current === "-") {
+    showCalcError("缺少操作数");
+    return false;
+  }
+  const a = calcState.previous;
+  const b = parseFloat(calcState.current);
+  const op = calcState.operator;
+  if (a === null || op === null || Number.isNaN(b)) return false;
+
+  calcState.busy = true;
+  try {
+    const data = await api("/api/calc", "POST", {
+      a: String(a), op, b: String(b),
+    });
+    calcState.current = data.result;
+    calcState.previous = isFinal ? null : parseFloat(data.result);
+    calcState.operator = isFinal ? null : op;
+    calcState.justEvaluated = isFinal;
+    calcState.errorMode = false;
+    renderCalc();
+    refreshHistory();
+    return true;
+  } catch (e) {
+    showCalcError(e.message);
+    return false;
+  } finally {
+    calcState.busy = false;
+  }
+}
+
+function showCalcError(msg) {
+  calcState.errorMode = true;
+  calcState.current = msg.length > 40 ? msg.slice(0, 40) + "…" : msg;
+  // Keep previous/operator as-is so user can correct rhs; but reset on AC.
+  renderCalc();
+}
+
+// ---------- keyboard ----------
+$("calc-root").addEventListener("keydown", (ev) => {
+  // Ignore if user is typing in an input elsewhere
+  const t = ev.target;
+  if (t && (t.tagName === "INPUT" || t.tagName === "SELECT" || t.tagName === "TEXTAREA")) return;
+
+  const k = ev.key;
+  if (/^[0-9]$/.test(k)) { inputDigit(k); ev.preventDefault(); return; }
+  if (k === ".") { inputDot(); ev.preventDefault(); return; }
+  if (k === "+" || k === "-" || k === "*" || k === "/") {
+    inputOperator(k); ev.preventDefault(); return;
+  }
+  if (k === "Enter" || k === "=") { inputEquals(); ev.preventDefault(); return; }
+  if (k === "Backspace") { inputDel(); ev.preventDefault(); return; }
+  if (k === "Escape") { resetCalc(); ev.preventDefault(); return; }
+});
+
+// Also capture document-level when calculator not focused
+document.addEventListener("keydown", (ev) => {
+  if ($("app-view").classList.contains("hidden")) return;
+  const t = ev.target;
+  if (t && (t.tagName === "INPUT" || t.tagName === "SELECT" || t.tagName === "TEXTAREA")) return;
+  // Forward to calc handler only if calc isn't already handling (it has focus)
+  if (document.activeElement !== $("calc-root")) {
+    $("calc-root").dispatchEvent(new KeyboardEvent("keydown", { key: ev.key }));
+    // but dispatching doesn't trigger `preventDefault` on the original...
+    // For the few keys that matter ("/", etc.) that's harmless here.
+  }
+});
+
+// ====================================================================
+// History
+// ====================================================================
+$("btn-refresh-history").onclick = refreshHistory;
+
+async function refreshHistory() {
+  try {
+    const data = await api("/api/history", "GET");
+    const tbody = $("history-table").querySelector("tbody");
+    tbody.innerHTML = "";
+    if (!data.history || data.history.length === 0) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = '<td colspan="3" class="muted">暂无记录</td>';
+      tbody.appendChild(tr);
+      return;
+    }
+    for (const row of data.history) {
+      const tr = document.createElement("tr");
+      const exprShown = row.expression.replace(/([+\-*/])/g, (m) => dispOp(m));
+      const time = new Date(row.created_at * 1000).toLocaleString();
+      tr.innerHTML =
+        "<td>" + escapeHtml(exprShown) + "</td>" +
+        "<td><strong>" + escapeHtml(row.result) + "</strong></td>" +
+        "<td class='small'>" + escapeHtml(time) + "</td>";
+      tbody.appendChild(tr);
+    }
+  } catch (e) {
+    console.warn(e);
+  }
+}
+
+// ====================================================================
+// Logout
+// ====================================================================
+$("btn-logout").onclick = async () => {
+  try { await api("/api/logout", "POST", {}); } catch (_) {}
+  currentUser = null;
+  show($("auth-view"));
+  hide($("app-view"));
+  $("auth-username").value = "";
+  $("auth-password").value = "";
+};
+
+// ====================================================================
+// Admin panel
+// ====================================================================
+async function refreshUsers() {
+  try {
+    const data = await api("/api/users", "GET");
+    renderUsers(data.users);
+  } catch (e) { console.warn(e); }
+}
+
+function renderUsers(users) {
+  const tbody = $("users-table").querySelector("tbody");
+  tbody.innerHTML = "";
+  for (const u of users) {
+    const tr = document.createElement("tr");
+    const status = u.banned
+      ? '<span class="tag banned">已封禁</span>'
+      : '<span class="tag" style="background:#16a34a;">正常</span>';
+    tr.innerHTML =
+      "<td>" + u.id + "</td>" +
+      "<td>" + escapeHtml(u.username) + "</td>" +
+      "<td><span class='tag " + u.role + "'>" + u.role + "</span></td>" +
+      "<td>" + status + "</td>" +
+      "<td></td>";
+    const actions = tr.lastElementChild;
+    if (u.id === currentUser.id) {
+      actions.innerHTML = '<span class="muted small">当前账号</span>';
+      tbody.appendChild(tr); continue;
+    }
+    const canTouch = currentUser.role === "superadmin"
+      ? true
+      : (u.role === "guest" || u.role === "member");
+    if (!canTouch) {
+      actions.innerHTML = '<span class="muted small">无权操作</span>';
+      tbody.appendChild(tr); continue;
+    }
+    const allowedRoles = currentUser.role === "superadmin"
+      ? ["guest", "member", "admin"]
+      : ["guest", "member"];
+    const select = document.createElement("select");
+    for (const r of allowedRoles) {
+      const opt = document.createElement("option");
+      opt.value = r; opt.textContent = r;
+      if (u.role === r) opt.selected = true;
+      select.appendChild(opt);
+    }
+    const saveBtn = document.createElement("button");
+    saveBtn.textContent = "保存角色";
+    saveBtn.className = "secondary";
+    saveBtn.style.marginLeft = "6px";
+    saveBtn.onclick = () => setRole(u.id, select.value);
+
+    const banBtn = document.createElement("button");
+    banBtn.textContent = u.banned ? "解除封禁" : "封禁";
+    banBtn.className = u.banned ? "success" : "danger";
+    banBtn.style.marginLeft = "6px";
+    banBtn.onclick = () => setBanned(u.id, !u.banned);
+
+    actions.appendChild(select);
+    actions.appendChild(saveBtn);
+    actions.appendChild(banBtn);
+    tbody.appendChild(tr);
+  }
+}
+
+async function setRole(userId, role) {
+  try {
+    await api("/api/users/role", "POST", { user_id: userId, role });
+    showOk("admin-msg", "角色已更新");
+    refreshUsers();
+  } catch (e) { alert(e.message); }
+}
+
+async function setBanned(userId, banned) {
+  try {
+    await api("/api/users/ban", "POST", { user_id: userId, banned });
+    showOk("admin-msg", banned ? "已封禁" : "已解封");
+    refreshUsers();
+  } catch (e) { alert(e.message); }
+}
+
+// ====================================================================
+// Rule tampering
+// ====================================================================
+async function refreshOverrides() {
+  try {
+    const data = await api("/api/overrides", "GET");
+    renderOverrides(data.overrides);
+  } catch (e) { console.warn(e); }
+}
+
+function renderOverrides(list) {
+  const tbody = $("rules-table").querySelector("tbody");
+  tbody.innerHTML = "";
+  if (!list || list.length === 0) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = '<td colspan="4" class="muted">暂无生效规则</td>';
+    tbody.appendChild(tr); return;
+  }
+  for (const r of list) {
+    const tr = document.createElement("tr");
+    const truth = realMath(r.a, r.op, r.b);
+    tr.innerHTML =
+      "<td>" + escapeHtml(r.a + " " + dispOp(r.op) + " " + r.b) + "</td>" +
+      "<td class='muted'>" + escapeHtml(truth) + "</td>" +
+      "<td><strong>" + escapeHtml(String(r.result)) + "</strong></td>" +
+      "<td></td>";
+    const btn = document.createElement("button");
+    btn.textContent = "删除";
+    btn.className = "danger";
+    btn.onclick = () => deleteRule(r.key);
+    tr.lastElementChild.appendChild(btn);
+    tbody.appendChild(tr);
+  }
+}
+
+function realMath(a, op, b) {
+  try {
+    a = Number(a); b = Number(b);
+    if (op === "+") return a + b;
+    if (op === "-") return a - b;
+    if (op === "*") return a * b;
+    if (op === "/") return b === 0 ? "∞" : a / b;
+  } catch (_) {}
+  return "?";
+}
+
+$("btn-add-rule").onclick = async () => {
+  const a = $("rule-a").value.trim();
+  const b = $("rule-b").value.trim();
+  const result = $("rule-result").value.trim();
+  const op = $("rule-op").value;
+  if (!a || !b || !result) { alert("请填写 A、B 和覆盖结果"); return; }
+  try {
+    await api("/api/overrides", "POST", { a, op, b, result });
+    $("rule-a").value = ""; $("rule-b").value = ""; $("rule-result").value = "";
+    refreshOverrides();
+  } catch (e) { alert(e.message); }
+};
+
+async function deleteRule(key) {
+  try {
+    await api("/api/overrides/delete", "POST", { key });
+    refreshOverrides();
+  } catch (e) { alert(e.message); }
+}
+
+// ====================================================================
+// Bootstrap
+// ====================================================================
+(async function init() {
+  try {
+    const data = await api("/api/me", "GET");
+    if (data.user) { currentUser = data.user; enterApp(); }
+  } catch (e) { /* stay on auth */ }
+})();
+</script>
+</body>
+</html>

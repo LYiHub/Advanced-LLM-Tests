@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Analog Clock 10:10</title>
+<style>
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    margin: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background-color: #ffffff;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  }
+  .clock {
+    width: 90vw;
+    max-width: 400px;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    border: 12px solid #222;
+    position: relative;
+    background: #ffffff;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15), inset 0 0 15px rgba(0,0,0,0.05);
+  }
+  .number {
+    position: absolute;
+    inset: 4%;
+    text-align: center;
+    transform: rotate(var(--deg));
+  }
+  .number span {
+    display: inline-block;
+    transform: rotate(calc(-1 * var(--deg)));
+    font-size: clamp(1.5rem, 6vw, 2.2rem);
+    font-weight: 700;
+    color: #222;
+  }
+  .hand {
+    position: absolute;
+    bottom: 50%;
+    left: 50%;
+    transform-origin: bottom center;
+    border-radius: 10px;
+  }
+  .hour {
+    width: 8px;
+    height: 26%;
+    background-color: #222;
+    margin-left: -4px;
+    z-index: 2;
+    transform: rotate(305deg);
+  }
+  .minute {
+    width: 6px;
+    height: 38%;
+    background-color: #555;
+    margin-left: -3px;
+    z-index: 3;
+    transform: rotate(60deg);
+  }
+  .second {
+    width: 2px;
+    height: 44%;
+    background-color: #e74c3c;
+    margin-left: -1px;
+    z-index: 4;
+    animation: tick 60s steps(60, end) infinite;
+  }
+  .second::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 100%;
+    height: 25px;
+    background-color: inherit;
+    border-radius: inherit;
+  }
+  .center-dot {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 18px;
+    height: 18px;
+    background-color: #e74c3c;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 5;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  }
+  .center-dot::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 6px;
+    height: 6px;
+    background-color: #222;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+  }
+  @keyframes tick {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+</style>
+</head>
+<body>
+
+  <div class="clock">
+    <div class="number" style="--deg: 30deg"><span>1</span></div>
+    <div class="number" style="--deg: 60deg"><span>2</span></div>
+    <div class="number" style="--deg: 90deg"><span>3</span></div>
+    <div class="number" style="--deg: 120deg"><span>4</span></div>
+    <div class="number" style="--deg: 150deg"><span>5</span></div>
+    <div class="number" style="--deg: 180deg"><span>6</span></div>
+    <div class="number" style="--deg: 210deg"><span>7</span></div>
+    <div class="number" style="--deg: 240deg"><span>8</span></div>
+    <div class="number" style="--deg: 270deg"><span>9</span></div>
+    <div class="number" style="--deg: 300deg"><span>10</span></div>
+    <div class="number" style="--deg: 330deg"><span>11</span></div>
+    <div class="number" style="--deg: 360deg"><span>12</span></div>
+
+    <div class="hand hour"></div>
+    <div class="hand minute"></div>
+    <div class="hand second"></div>
+    
+    <div class="center-dot"></div>
+  </div>
+
+</body>
+</html>

@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>汽车变速箱工作原理 3D 演示</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { overflow: hidden; font-family: 'Segoe UI', 'PingFang SC', sans-serif; background: #000; color: #cfe9ff; }
+#canvas-container { position: fixed; inset: 0; }
+#panel {
+  position: fixed; top: 20px; left: 20px; width: 310px; padding: 20px;
+  background: rgba(10, 25, 45, 0.35); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(100, 200, 255, 0.3); border-radius: 14px;
+  box-shadow: 0 8px 32px rgba(0, 150, 255, 0.15);
+  color: #e0f4ff; z-index: 10;
+}
+#panel h2 { font-size: 17px; margin-bottom: 14px; color: #7fd4ff; letter-spacing: 1px; border-bottom: 1px solid rgba(127,212,255,0.3); padding-bottom: 8px;}
+.section { margin-bottom: 18px; }
+.section label { display: block; font-size: 13px; margin-bottom: 8px; color: #a0d8ff; }
+input[type=range] { width: 100%; accent-color: #00c8ff; }
+.gear-buttons { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.gear-buttons button {
+  padding: 10px 0; background: rgba(0, 80, 140, 0.3); border: 1px solid rgba(127,212,255,0.4);
+  color: #cfe9ff; border-radius: 6px; cursor: pointer; font-weight: bold; transition: all 0.2s;
+}
+.gear-buttons button:hover { background: rgba(0, 140, 220, 0.5); }
+.gear-buttons button.active { background: linear-gradient(135deg, #0088cc, #00c8ff); color: #fff; box-shadow: 0 0 12px #00c8ff; }
+#hud {
+  margin-top: 10px; padding: 12px; background: rgba(0, 30, 60, 0.4); border-radius: 8px;
+  border: 1px solid rgba(127,212,255,0.2); font-family: 'Consolas', monospace; font-size: 13px;
+}
+.hud-row { display: flex; justify-content: space-between; padding: 4px 0; }
+.hud-row span:first-child { color: #7fa8c8; }
+.hud-row span:last-child { color: #00eaff; font-weight: bold; }
+#title {
+  position: fixed; top: 20px; right: 20px; padding: 10px 20px;
+  background: rgba(10, 25, 45, 0.35); backdrop-filter: blur(14px);
+  border: 1px solid rgba(100, 200, 255, 0.3); border-radius: 10px;
+  font-size: 14px; color: #7fd4ff; letter-spacing: 2px; z-index: 10;
+}
+</style>
+</head>
+<body>
+<div id="canvas-container"></div>
+<div id="title">TRANSMISSION SIMULATOR v1.0</div>
+<div id="panel">
+  <h2>⚙ 变速箱控制台</h2>
+  <div class="section">
+    <label>发动机转速: <span id="rpmVal">2000</span> RPM</label>
+    <input type="range" id="rpmSlider" min="0" max="6000" value="2000" step="50">
+  </div>
+  <div class="section">
+    <label>挡位选择</label>
+    <div class="gear-buttons">
+      <button data-gear="N" class="active">N</button>
+      <button data-gear="1">1</button>
+      <button data-gear="2">2</button>
+      <button data-gear="3">3</button>
+      <button data-gear="R">R</button>
+    </div>
+  </div>
+  <div id="hud">
+    <div class="hud-row"><span>当前挡位</span><span id="hudGear">N</span></div>
+    <div class="hud-row"><span>传动比</span><span id="hudRatio">∞</span></div>
+    <div class="hud-row"><span>离合器</span><span id="hudClutch">分离</span></div>
+    <div class="hud-row"><span>输入 RPM</span><span id="hudInput">2000</span></div>
+    <div class="hud-row"><span>输出 RPM</span><span id="hudOutput">0</span></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// OrbitControls (r128 inline)
+THREE.OrbitControls=function(e,t){this.object=e,this.domElement=void 0!==t?t:document,this.enabled=!0,this.target=new THREE.Vector3,this.minDistance=0,this.maxDistance=1/0,this.minZoom=0,this.maxZoom=1/0,this.minPolarAngle=0,this.maxPolarAngle=Math.PI,this.minAzimuthAngle=-1/0,this.maxAzimuthAngle=1/0,this.enableDamping=!1,this.dampingFactor=.05,this.enableZoom=!0,this.zoomSpeed=1,this.enableRotate=!0,this.rotateSpeed=1,this.enablePan=!0,this.panSpeed=1,this.screenSpacePanning=!0,this.keyPanSpeed=7,this.autoRotate=!1,this.autoRotateSpeed=2,this.enableKeys=!0,this.keys={LEFT:37,UP:38,RIGHT:39,BOTTOM:40},this.mouseButtons={LEFT:THREE.MOUSE.ROTATE,MIDDLE:THREE.MOUSE.DOLLY,RIGHT:THREE.MOUSE.PAN},this.touches={ONE:THREE.TOUCH.ROTATE,TWO:THREE.TOUCH.DOLLY_PAN},this.target0=this.target.clone(),this.position0=this.object.position.clone(),this.zoom0=this.object.zoom,this.getPolarAngle=function(){return a.phi},this.getAzimuthalAngle=function(){return a.theta},this.saveState=function(){o.target0.copy(o.target),o.position0.copy(o.object.position),o.zoom0=o.object.zoom},this.reset=function(){o.target.copy(o.target0),o.object.position.copy(o.position0),o.object.zoom=o.zoom0,o.object.updateProjectionMatrix(),o.dispatchEvent(n),o.update(),i=r.NONE},this.update=function(){var t=new THREE.Vector3,n=(new THREE.Quaternion).setFromUnitVectors(e.up,new THREE.Vector3(0,1,0)),i=n.clone().inverse(),u=new THREE.Vector3,c=new THREE.Quaternion;return function(){var h=o.object.position;return t.copy(h).sub(o.target),t.applyQuaternion(n),a.setFromVector3(t),o.autoRotate&&i===r.NONE&&E(2*Math.PI/60/60*o.autoRotateSpeed),o.enableDamping?(a.theta+=s.theta*o.dampingFactor,a.phi+=s.phi*o.dampingFactor):(a.theta+=s.theta,a.phi+=s.phi),a.theta=Math.max(o.minAzimuthAngle,Math.min(o.maxAzimuthAngle,a.theta)),a.phi=Math.max(o.minPolarAngle,Math.min(o.maxPolarAngle,a.phi)),a.makeSafe(),a.radius*=l,a.radius=Math.max(o.minDistance,Math.min(o.maxDistance,a.radius)),!0===o.enableDamping?o.target.addScaledVector(d,o.dampingFactor):o.target.add(d),t.setFromSpherical(a),t.applyQuaternion(i),h.copy(o.target).add(t),o.object.lookAt(o.target),!0===o.enableDamping?(s.theta*=1-o.dampingFactor,s.phi*=1-o.dampingFactor,d.multiplyScalar(1-o.dampingFactor)):(s.set(0,0,0),d.set(0,0,0)),l=1,!!(p||u.distanceToSquared(o.object.position)>h||8*(1-c.dot(o.object.quaternion))>h)&&(o.dispatchEvent(n),u.copy(o.object.position),c.copy(o.object.quaternion),p=!1,!0)}}(),this.dispose=function(){o.domElement.removeEventListener("contextmenu",q,!1),o.domElement.removeEventListener("mousedown",K,!1),o.domElement.removeEventListener("wheel",Q,!1),o.domElement.removeEventListener("touchstart",Z,!1),o.domElement.removeEventListener("touchend",J,!1),o.domElement.removeEventListener("touchmove",$,!1),document.removeEventListener("mousemove",Y,!1),document.removeEventListener("mouseup",X,!1),o.domElement.removeEventListener("keydown",ee,!1)};var o=this,n={type:"change"},i={type:"start"},u={type:"end"},r={NONE:-1,ROTATE:0,DOLLY:1,PAN:2,TOUCH_ROTATE:3,TOUCH_PAN:4,TOUCH_DOLLY_PAN:5,TOUCH_DOLLY_ROTATE:6},c=r.NONE,h=1e-6,a=new THREE.Spherical,s=new THREE.Spherical,l=1,d=new THREE.Vector3,p=!1,E=new THREE.Vector2,T=new THREE.Vector2,O=new THREE.Vector2,v=new THREE.Vector2,f=new THREE.Vector2,m=new THREE.Vector2,M=new THREE.Vector2,y=new THREE.Vector2,b=new THREE.Vector2;function g(){return Math.pow(.95,o.zoomSpeed)}function E(e){s.theta-=e}function w(e){s.phi-=e}var H=function(){var e=new THREE.Vector3;return function(t,n){e.setFromMatrixColumn(n,0),e.multiplyScalar(-t),d.add(e)}}(),R=function(){var e=new THREE.Vector3;return function(t,n){!0===o.screenSpacePanning?e.setFromMatrixColumn(n,1):(e.setFromMatrixColumn(n,0),e.crossVectors(o.object.up,e)),e.multiplyScalar(t),d.add(e)}}(),L=function(){var e=new THREE.Vector3;return function(t,n){var i=o.domElement===document?o.domElement.body:o.domElement;if(o.object.isPerspectiveCamera){var u=o.object.position;e.copy(u).sub(o.target);var r=e.length();r*=Math.tan(o.object.fov/2*Math.PI/180),H(2*t*r/i.clientHeight,o.object.matrix),R(2*n*r/i.clientHeight,o.object.matrix)}else o.object.isOrthographicCamera?(H(t*(o.object.right-o.object.left)/o.object.zoom/i.clientWidth,o.object.matrix),R(n*(o.object.top-o.object.bottom)/o.object.zoom/i.clientHeight,o.object.matrix)):(console.warn("WARNING: OrbitControls.js encountered an unknown camera type - pan disabled."),o.enablePan=!1)}}();function P(e){o.object.isPerspectiveCamera?l/=e:o.object.isOrthographicCamera?(o.object.zoom=Math.max(o.minZoom,Math.min(o.maxZoom,o.object.zoom*e)),o.object.updateProjectionMatrix(),p=!0):(console.warn("WARNING: OrbitControls.js encountered an unknown camera type - dolly/zoom disabled."),o.enableZoom=!1)}function N(e){o.object.isPerspectiveCamera?l*=e:o.object.isOrthographicCamera?(o.object.zoom=Math.max(o.minZoom,Math.min(o.maxZoom,o.object.zoom/e)),o.object.updateProjectionMatrix(),p=!0):(console.warn("WARNING: OrbitControls.js encountered an unknown camera type - dolly/zoom disabled."),o.enableZoom=!1)}function S(e){E.set(e.clientX,e.clientY)}function C(e){M.set(e.clientX,e.clientY)}function A(e){v.set(e.clientX,e.clientY)}function U(e){T.set(e.clientX,e.clientY),O.subVectors(T,E).multiplyScalar(o.rotateSpeed);var t=o.domElement===document?o.domElement.body:o.domElement;E(2*Math.PI*O.x/t.clientHeight),w(2*Math.PI*O.y/t.clientHeight),E.copy(T),o.update()}function D(e){y.set(e.clientX,e.clientY),b.subVectors(y,M),b.y>0?P(g()):b.y<0&&N(g()),M.copy(y),o.update()}function I(e){f.set(e.clientX,e.clientY),m.subVectors(f,v).multiplyScalar(o.panSpeed),L(m.x,m.y),v.copy(f),o.update()}function k(e){e.deltaY<0?N(g()):e.deltaY>0&&P(g()),o.update()}function _(e){var t=!1;switch(e.keyCode){case o.keys.UP:L(0,o.keyPanSpeed),t=!0;break;case o.keys.BOTTOM:L(0,-o.keyPanSpeed),t=!0;break;case o.keys.LEFT:L(o.keyPanSpeed,0),t=!0;break;case o.keys.RIGHT:L(-o.keyPanSpeed,0),t=!0}t&&(e.preventDefault(),o.update())}function x(e){if(1==e.touches.length)E.set(e.touches[0].pageX,e.touches[0].pageY);else{var t=.5*(e.touches[0].pageX+e.touches[1].pageX),n=.5*(e.touches[0].pageY+e.touches[1].pageY);E.set(t,n)}}function G(e){if(1==e.touches.length)v.set(e.touches[0].pageX,e.touches[0].pageY);else{var t=.5*(e.touches[0].pageX+e.touches[1].pageX),n=.5*(e.touches[0].pageY+e.touches[1].pageY);v.set(t,n)}}function V(e){var t=e.touches[0].pageX-e.touches[1].pageX,n=e.touches[0].pageY-e.touches[1].pageY,i=Math.sqrt(t*t+n*n);M.set(0,i)}function F(e){o.enableZoom&&V(e),o.enablePan&&G(e)}function j(e){o.enableZoom&&V(e),o.enableRotate&&x(e)}function B(e){if(1==e.touches.length)T.set(e.touches[0].pageX,e.touches[0].pageY);else{var t=.5*(e.touches[0].pageX+e.touches[1].pageX),n=.5*(e.touches[0].pageY+e.touches[1].pageY);T.set(t,n)}O.subVectors(T,E).multiplyScalar(o.rotateSpeed);var i=o.domElement===document?o.domElement.body:o.domElement;E(2*Math.PI*O.x/i.clientHeight),w(2*Math.PI*O.y/i.clientHeight),E.copy(T),o.update()}function W(e){if(1==e.touches.length)f.set(e.touches[0].pageX,e.touches[0].pageY);else{var t=.5*(e.touches[0].pageX+e.touches[1].pageX),n=.5*(e.touches[0].pageY+e.touches[1].pageY);f.set(t,n)}m.subVectors(f,v).multiplyScalar(o.panSpeed),L(m.x,m.y),v.copy(f),o.update()}function z(e){var t=e.touches[0].pageX-e.touches[1].pageX,n=e.touches[0].pageY-e.touches[1].pageY,i=Math.sqrt(t*t+n*n);y.set(0,i),b.set(0,Math.pow(y.y/M.y,o.zoomSpeed)),P(b.y),M.copy(y)}function Y_(e){o.enableZoom&&z(e),o.enablePan&&W(e)}function K_(e){o.enableZoom&&z(e),o.enableRotate&&B(e)}function K(e){if(!1!==o.enabled){switch(e.preventDefault(),o.domElement.focus?o.domElement.focus():window.focus(),e.button){case 0:switch(o.mouseButtons.LEFT){case THREE.MOUSE.ROTATE:if(e.ctrlKey||e.metaKey||e.shiftKey){if(!1===o.enablePan)return;A(e),c=r.PAN}else{if(!1===o.enableRotate)return;S(e),c=r.ROTATE}break;case THREE.MOUSE.PAN:if(e.ctrlKey||e.metaKey||e.shiftKey){if(!1===o.enableRotate)return;S(e),c=r.ROTATE}else{if(!1===o.enablePan)return;A(e),c=r.PAN}break;default:c=r.NONE}break;case 1:switch(o.mouseButtons.MIDDLE){case THREE.MOUSE.DOLLY:if(!1===o.enableZoom)return;C(e),c=r.DOLLY;break;default:c=r.NONE}break;case 2:switch(o.mouseButtons.RIGHT){case THREE.MOUSE.ROTATE:if(!1===o.enableRotate)return;S(e),c=r.ROTATE;break;case THREE.MOUSE.PAN:if(!1===o.enablePan)return;A(e),c=r.PAN;break;default:c=r.NONE}}c!==r.NONE&&(document.addEventListener("mousemove",Y,!1),document.addEventListener("mouseup",X,!1),o.dispatchEvent(i))}}function Y(e){if(!1!==o.enabled)switch(e.preventDefault(),c){case r.ROTATE:if(!1===o.enableRotate)return;U(e);break;case r.DOLLY:if(!1===o.enableZoom)return;D(e);break;case r.PAN:if(!1===o.enablePan)return;I(e)}}function X(e){!1!==o.enabled&&(document.removeEventListener("mousemove",Y,!1),document.removeEventListener("mouseup",X,!1),o.dispatchEvent(u),c=r.NONE)}function Q(e){!1===o.enabled||!1===o.enableZoom||c!==r.NONE&&c!==r.ROTATE||(e.preventDefault(),e.stopPropagation(),o.dispatchEvent(i),k(e),o.dispatchEvent(u))}function ee(e){!1!==o.enabled&&!1!==o.enableKeys&&!1!==o.enablePan&&_(e)}function Z(e){if(!1!==o.enabled){switch(e.preventDefault(),e.touches.length){case 1:switch(o.touches.ONE){case THREE.TOUCH.ROTATE:if(!1===o.enableRotate)return;x(e),c=r.TOUCH_ROTATE;break;case THREE.TOUCH.PAN:if(!1===o.enablePan)return;G(e),c=r.TOUCH_PAN;break;default:c=r.NONE}break;case 2:switch(o.touches.TWO){case THREE.TOUCH.DOLLY_PAN:if(!1===o.enableZoom&&!1===o.enablePan)return;F(e),c=r.TOUCH_DOLLY_PAN;break;case THREE.TOUCH.DOLLY_ROTATE:if(!1===o.enableZoom&&!1===o.enableRotate)return;j(e),c=r.TOUCH_DOLLY_ROTATE;break;default:c=r.NONE}break;default:c=r.NONE}c!==r.NONE&&o.dispatchEvent(i)}}function $(e){if(!1!==o.enabled)switch(e.preventDefault(),e.stopPropagation(),c){case r.TOUCH_ROTATE:if(!1===o.enableRotate)return;B(e),o.update();break;case r.TOUCH_PAN:if(!1===o.enablePan)return;W(e),o.update();break;case r.TOUCH_DOLLY_PAN:if(!1===o.enableZoom&&!1===o.enablePan)return;Y_(e),o.update();break;case r.TOUCH_DOLLY_ROTATE:if(!1===o.enableZoom&&!1===o.enableRotate)return;K_(e),o.update();break;default:c=r.NONE}}function J(e){!1!==o.enabled&&(o.dispatchEvent(u),c=r.NONE)}function q(e){!1!==o.enabled&&e.preventDefault()}o.domElement.addEventListener("contextmenu",q,!1),o.domElement.addEventListener("mousedown",K,!1),o.domElement.addEventListener("wheel",Q,!1),o.domElement.addEventListener("touchstart",Z,!1),o.domElement.addEventListener("touchend",J,!1),o.domElement.addEventListener("touchmove",$,!1),o.domElement.addEventListener("keydown",ee,!1),-1===o.domElement.tabIndex&&(o.domElement.tabIndex=0),this.update()},THREE.OrbitControls.prototype=Object.create(THREE.EventDispatcher.prototype),THREE.OrbitControls.prototype.constructor=THREE.OrbitControls;
+
+// === Scene Setup ===
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x03060a);
+scene.fog = new THREE.Fog(0x03060a, 20, 60);
+
+const camera = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, 0.1, 200);
+camera.position.set(8, 6, 12);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.target.set(0, 0, 0);
+
+// Lights
+scene.add(new THREE.AmbientLight(0x335577, 0.6));
+const dir = new THREE.DirectionalLight(0xaaddff, 0.9);
+dir.position.set(10, 15, 8);
+scene.add(dir);
+const p1 = new THREE.PointLight(0x00aaff, 1.2, 30);
+p1.position.set(-6, 4, 4); scene.add(p1);
+const p2 = new THREE.PointLight(0xff3366, 0.8, 25);
+p2.position.set(6, 3, -4); scene.add(p2);
+
+// Grid
+const grid = new THREE.GridHelper(60, 60, 0x0088cc, 0x003355);
+grid.position.y = -4;
+scene.add(grid);
+
+// === Gear Creation ===
+function createGear(radius, teeth, thickness, color) {
+  const group = new THREE.Group();
+  const toothH = 0.15;
+  const shape = new THREE.Shape();
+  for (let i = 0; i < teeth; i++) {
+    const a1 = (i / teeth) * Math.PI * 2;
+    const a2 = ((i + 0.3) / teeth) * Math.PI * 2;
+    const a3 = ((i + 0.7) / teeth) * Math.PI * 2;
+    const a4 = ((i + 1) / teeth) * Math.PI * 2;
+    const rOut = radius + toothH;
+    const rIn = radius;
+    if (i === 0) shape.moveTo(Math.cos(a1)*rIn, Math.sin(a1)*rIn);
+    shape.lineTo(Math.cos(a1)*rOut, Math.sin(a1)*rOut);
+    shape.lineTo(Math.cos(a2)*rOut, Math.sin(a2)*rOut);
+    shape.lineTo(Math.cos(a3)*rIn, Math.sin(a3)*rIn);
+    shape.lineTo(Math.cos(a4)*rIn, Math.sin(a4)*rIn);
+  }
+  // hole
+  const hole = new THREE.Path();
+  hole.absarc(0, 0, radius * 0.15, 0, Math.PI * 2, true);
+  shape.holes.push(hole);
+  
+  const geom = new THREE.ExtrudeGeometry(shape, { depth: thickness, bevelEnabled: true, bevelSize: 0.03, bevelThickness: 0.03, bevelSegments: 2 });
+  geom.center();
+  const mat = new THREE.MeshStandardMaterial({ color, metalness: 0.85, roughness: 0.3, emissive: color, emissiveIntensity: 0.05 });
+  const mesh = new THREE.Mesh(geom, mat);
+  mesh.rotation.x = Math.PI / 2;
+  group.add(mesh);
+  
+  // wireframe overlay
+  const wireMat = new THREE.MeshBasicMaterial({ color: 0x66ccff, wireframe: true, transparent: true, opacity: 0.2 });
+  const wire = new THREE.Mesh(geom, wireMat);
+  wire.rotation.x = Math.PI / 2;
+  group.add(wire);
+  
+  group.userData.teeth = teeth;
+  group.userData.radius = radius;
+  return group;
+}
+
+// === Shafts ===
+const inputShaft = new THREE.Group();
+const inShaftMesh = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.25, 0.25, 10, 24),
+  new THREE.MeshStandardMaterial({ color: 0xff2a44, metalness: 0.8, roughness: 0.25, emissive: 0xff0022, emissiveIntensity: 0.25 })
+);
+inShaftMesh.rotation.z = Math.PI / 2;
+inputShaft.add(inShaftMesh);
+inputShaft.position.set(0, 1.2, 0);
+scene.add(inputShaft);
+
+const outputShaft = new THREE.Group();
+const outShaftMesh = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.25, 0.25, 10, 24),
+  new THREE.MeshStandardMaterial({ color: 0x00e0d0, metalness: 0.8, roughness: 0.25, emissive: 0x00aaaa, emissiveIntensity: 0.25 })
+);
+outShaftMesh.rotation.z = Math.PI / 2;
+outputShaft.add(outShaftMesh);
+outputShaft.position.set(0, -1.2, 0);
+scene.add(outputShaft);
+
+// Gear pairs (drive on input, driven on output)
+// Each gear pair: [drive teeth count -> driven teeth count], ratio = driven/drive
+// Gear set: positions along X axis
+const gearConfigs = [
+  { x: -3,   driveR: 0.6, driveT: 14, drivenR: 1.2, drivenT: 28, ratio: 2.0, name: '2' },
+  { x: -1,   driveR: 0.5, driveT: 12, drivenR: 1.5, drivenT: 36, ratio: 3.0, name: '1' },
+  { x: 1,    driveR: 0.9, driveT: 22, drivenR: 0.9, drivenT: 22, ratio: 1.0, name: '3' },
+  { x: 3,    driveR: 0.7, driveT: 16, drivenR: 1.1, drivenT: 26, ratio: 2.5, reverse: true, name: 'R' }
+];
+
+const driveGears = [];
+const drivenGears = [];
+const idlerGears = []; // for reverse
+
+gearConfigs.forEach((cfg, i) => {
+  const col1 = new THREE.Color().setHSL(0.55 + i*0.05, 0.6, 0.55);
+  const col2 = new THREE.Color().setHSL(0.6 + i*0.05, 0.7, 0.5);
+  
+  const drive = createGear(cfg.driveR, cfg.driveT, 0.35, col1);
+  drive.position.set(cfg.x, 1.2, 0);
+  drive.rotation.y = 0;
+  // axis of rotation is X axis -> rotate gear so its disc normal = X
+  drive.rotation.order = 'ZYX';
+  scene.add(drive);
+  driveGears.push(drive);
+  
+  const drivenY = 1.2 - (cfg.driveR + cfg.drivenR);
+  const driven = createGear(cfg.drivenR, cfg.drivenT, 0.35, col2);
+  driven.position.set(cfg.x, drivenY, 0);
+  scene.add(driven);
+  drivenGears.push(driven);
+  
+  // Link output shaft position to match driven center
+  if (i === 0) outputShaft.position.y = drivenY;
+  
+  // Idler for reverse
+  if (cfg.reverse) {
+    const idler = createGear(0.4, 10, 0.35, 0xff8800);
+    idler.position.set(cfg.x, (1.2 + drivenY)/2, 1.0);
+    scene.add(idler);
+    idlerGears.push({ mesh: idler, pairIndex: i });
+  }
+});
+
+// Align output shaft Y to average of driven gears (simplify: place at -1.5)
+outputShaft.position.y = -1.5;
+// Re-place driven gears relative to outputShaft's Y? Simpler: re-adjust drive positions so output is consistent
+// Reposition: keep output shaft at y=-1.5, and adjust driven & drive gear radii visual by translating driven to y=-1.5
+drivenGears.forEach((dg, i) => {
+  dg.position.y = -1.5;
+  // adjust drive gear so gears still touch visually (approximate)
+  const cfg = gearConfigs[i];
+  driveGears[i].position.y = -1.5 + cfg.driveR + cfg.drivenR;
+});
+inputShaft.position.y = driveGears[0].position.y; // keep shaft aligned with drives
+// actually drive gears at same height ideally — let's set all drive gears to y=1.2 and adapt: we'll place driven gears so total distance = r1+r2 below
+// Reset cleaner approach:
+inputShaft.position.y = 1.5;
+driveGears.forEach((dg, i) => {
+  dg.position.y = 1.5;
+  const cfg = gearConfigs[i];
+  drivenGears[i].position.y = 1.5 - (cfg.driveR + cfg.drivenR);
+});
+// Put output shaft at y = average
+const avgY = drivenGears.reduce((s,g)=>s+g.position.y,0)/drivenGears.length;
+outputShaft.position.y = avgY;
+// Slight adjustment: set output shaft at a single y, driven gears may not all touch drives perfectly — visual only
+outputShaft.position.y = -1.0;
+
+// Clutch (disc between engine and first gear)
+const clutchGroup = new THREE.Group();
+const clutchDisc = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.7, 0.7, 0.2, 32),
+  new THREE.MeshStandardMaterial({ color: 0xffaa00, metalness: 0.6, roughness: 0.4, transparent: true, opacity: 0.85, emissive: 0xff6600, emissiveIntensity: 0.3 })
+);
+clutchDisc.rotation.z = Math.PI / 2;
+clutchGroup.add(clutchDisc);
+clutchGroup.position.set(-4.5, 1.5, 0);
+scene.add(clutchGroup);
+
+// Housing frame (semi-transparent box)
+const housing = new THREE.Mesh(
+  new THREE.BoxGeometry(10, 4.5, 3.5),
+  new THREE.MeshBasicMaterial({ color: 0x0088ff, wireframe: true, transparent: true, opacity: 0.15 })
+);
+housing.position.set(0, 0.2, 0);
+scene.add(housing);
+
+// Synchronizer sliders (small rings on input shaft that visually move to engaged gear)
+const syncRing = new THREE.Mesh(
+  new THREE.TorusGeometry(0.35, 0.08, 12, 32),
+  new THREE.MeshStandardMaterial({ color: 0x00ffff, emissive: 0x00aaff, emissiveIntensity: 0.5, metalness: 0.7, roughness: 0.3 })
+);
+syncRing.rotation.y = Math.PI / 2;
+syncRing.position.set(0, 1.5, 0);
+scene.add(syncRing);
+
+// === State ===
+const state = {
+  rpm: 2000,
+  gear: 'N',
+  inputRot: 0,
+  outputRot: 0,
+  clutchEngagement: 0, // 0 = disengaged, 1 = fully engaged
+  currentRatio: 0, // effective ratio (0 = neutral)
+  targetRatio: 0,
+  targetReverse: false,
+  currentReverse: false,
+  syncTargetX: 0
+};
+
+const gearMap = {
+  'N': { ratio: 0, reverse: false, syncX: 0 },
+  '1': { ratio: 3.0, reverse: false, syncX: -1 },
+  '2': { ratio: 2.0, reverse: false, syncX: -3 },
+  '3': { ratio: 1.0, reverse: false, syncX: 1 },
+  'R': { ratio: 2.5, reverse: true, syncX: 3 }
+};
+
+// UI
+const rpmSlider = document.getElementById('rpmSlider');
+const rpmVal = document.getElementById('rpmVal');
+rpmSlider.addEventListener('input', () => {
+  state.rpm = +rpmSlider.value;
+  rpmVal.textContent = state.rpm;
+});
+
+document.querySelectorAll('.gear-buttons button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.gear-buttons button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.gear = btn.dataset.gear;
+    const cfg = gearMap[state.gear];
+    state.targetRatio = cfg.ratio;
+    state.targetReverse = cfg.reverse;
+    state.syncTargetX = cfg.syncX;
+  });
+});
+
+// HUD refs
+const hudGear = document.getElementById('hudGear');
+const hudRatio = document.getElementById('hudRatio');
+const hudClutch = document.getElementById('hudClutch');
+const hudInput = document.getElementById('hudInput');
+const hudOutput = document.getElementById('hudOutput');
+
+// === Animation Loop ===
+let lastTime = performance.now();
+function animate() {
+  requestAnimationFrame(animate);
+  const now = performance.now();
+  const dt = Math.min((now - lastTime) / 1000, 0.05);
+  lastTime = now;
+  
+  // Clutch engagement logic
+  const targetEngagement = (state.gear === 'N') ? 0 : 1;
+  state.clutchEngagement += (targetEngagement - state.clutchEngagement) * Math.min(dt * 2.5, 1);
+  
+  // Smooth ratio
+  state.currentRatio += (state.targetRatio - state.currentRatio) * Math.min(dt * 3, 1);
+  
+  // Sync ring movement
+  syncRing.position.x += (state.syncTargetX - syncRing.position.x) * Math.min(dt * 4, 1);
+  
+  // Clutch visual
+  clutchDisc.material.opacity = 0.4 + state.clutchEngagement * 0.55;
+  clutchDisc.scale.x = clutchDisc.scale.z = 0.9 + state.clutchEngagement * 0.15;
+  
+  // Reverse direction smoothing
+  const reverseSign = state.targetReverse ? -1 : 1;
+  
+  // Input rotation (rad/s), rpm -> rad/s = rpm * 2pi / 60
+  const inputAngSpeed = (state.rpm * 2 * Math.PI) / 60;
+  state.inputRot += inputAngSpeed * dt;
+  
+  inputShaft.rotation.x = state.inputRot;
+  clutchGroup.rotation.x = state.inputRot * state.clutchEngagement;
+  
+  // Drive gears rotate with input shaft (when clutch engaged transmits power)
+  driveGears.forEach(g => {
+    g.rotation.x = state.inputRot;
+  });
+  
+  // Output rotation - depends on engaged gear
+  let outputAngSpeed = 0;
+  if (state.currentRatio > 0.05) {
+    outputAngSpeed = (inputAngSpeed / state.currentRatio) * state.clutchEngagement * reverseSign;
+  }
+  state.outputRot += outputAngSpeed * dt;
+  
+  outputShaft.rotation.x = state.outputRot;
+  
+  // Driven gears: the engaged one follows output; others spin freely (idle) at their natural ratio or idle
+  drivenGears.forEach((g, i) => {
+    const cfg = gearConfigs[i];
+    // Meshing: driven_rot = -drive_rot * (driveTeeth / drivenTeeth)
+    const meshRatio = cfg.driveT / cfg.drivenT;
+    g.rotation.x = -state.inputRot * meshRatio * state.clutchEngagement;
+  });
+  
+  // Idler gears (reverse)
+  idlerGears.forEach(({ mesh, pairIndex }) => {
+    const cfg = gearConfigs[pairIndex];
+    mesh.rotation.x = state.inputRot * (cfg.driveT / 10) * state.clutchEngagement;
+  });
+  
+  // For the ENGAGED gear, override output shaft & driven to synchronize output motion
+  // (visual: driven gear rotation should correspond to output shaft)
+  // We'll highlight engaged gear
+  drivenGears.forEach((g, i) => {
+    const cfg = gearConfigs[i];
+    const isEngaged = (cfg.name === state.gear);
+    g.children[0].material.emissiveIntensity = isEngaged ? 0.35 : 0.05;
+  });
+  driveGears.forEach((g, i) => {
+    const cfg = gearConfigs[i];
+    const isEngaged = (cfg.name === state.gear);
+    g.children[0].material.emissiveIntensity = isEngaged ? 0.35 : 0.05;
+  });
+  
+  // HUD
+  hudGear.textContent = state.gear;
+  hudRatio.textContent = state.gear === 'N' ? '∞ (空挡)' : 
+    (state.targetReverse ? '-' : '') + state.currentRatio.toFixed(2) + ':1';
+  hudClutch.textContent = state.clutchEngagement > 0.95 ? '接合' : 
+    (state.clutchEngagement < 0.05 ? '分离' : '接合中 ' + (state.clutchEngagement*100).toFixed(0)+'%');
+  hudInput.textContent = state.rpm;
+  const outRpm = state.currentRatio > 0.05 ? (state.rpm / state.currentRatio) * state.clutchEngagement * reverseSign : 0;
+  hudOutput.textContent = outRpm.toFixed(0);
+  
+  controls.update();
+  renderer.render(scene, camera);
+}
+animate();
+
+window.addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>

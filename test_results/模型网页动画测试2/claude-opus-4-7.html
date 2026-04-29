@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Motion Sequence</title>
+<style>
+  html,body{margin:0;padding:0;background:#000;overflow:hidden;height:100%;width:100%;font-family:'Helvetica Neue',Arial,sans-serif;}
+  canvas{display:block;position:absolute;top:0;left:0;width:100%;height:100%;}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+const canvas=document.getElementById('c');
+const ctx=canvas.getContext('2d');
+let W,H,cx,cy;
+function resize(){
+  W=canvas.width=window.innerWidth*devicePixelRatio;
+  H=canvas.height=window.innerHeight*devicePixelRatio;
+  canvas.style.width=window.innerWidth+'px';
+  canvas.style.height=window.innerHeight+'px';
+  cx=W/2;cy=H/2;
+}
+resize();
+window.addEventListener('resize',resize);
+
+const DPR=devicePixelRatio;
+const START=performance.now();
+
+// easing
+const easeOut=t=>1-Math.pow(1-t,3);
+const easeInOut=t=>t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
+const easeIn=t=>t*t*t;
+const clamp=(a,b,c)=>Math.max(b,Math.min(c,a));
+
+// particles for vortex/watch
+let particles=[];
+function initParticles(n){
+  particles=[];
+  for(let i=0;i<n;i++){
+    const a=Math.random()*Math.PI*2;
+    const r=40+Math.random()*180;
+    particles.push({
+      a,r,
+      speed:(Math.random()<.5?1:-1)*(0.3+Math.random()*0.8),
+      ecc:0.5+Math.random()*0.5,
+      phase:Math.random()*Math.PI*2,
+      tx:0,ty:0,
+      flicker:Math.random()*Math.PI*2
+    });
+  }
+}
+initParticles(350);
+
+// watch outline target points
+function watchTargets(n,scale){
+  // rectangular watch case with lugs
+  const pts=[];
+  const w=180*scale, h=240*scale, r=30*scale;
+  // rounded rect perimeter
+  const peri=2*(w-2*r)+2*(h-2*r)+2*Math.PI*r;
+  for(let i=0;i<n*0.7;i++){
+    const t=(i/(n*0.7))*peri;
+    let x,y;
+    let s=t;
+    if(s<w-2*r){x=-w/2+r+s;y=-h/2;}
+    else if((s-=w-2*r)<Math.PI*r/2){const a=-Math.PI/2+s/r;x=w/2-r+Math.cos(a)*r;y=-h/2+r+Math.sin(a)*r;}
+    else if((s-=Math.PI*r/2)<h-2*r){x=w/2;y=-h/2+r+s;}
+    else if((s-=h-2*r)<Math.PI*r/2){const a=0+s/r;x=w/2-r+Math.cos(a)*r;y=h/2-r+Math.sin(a)*r;}
+    else if((s-=Math.PI*r/2)<w-2*r){x=w/2-r-s;y=h/2;}
+    else if((s-=w-2*r)<Math.PI*r/2){const a=Math.PI/2+s/r;x=-w/2+r+Math.cos(a)*r;y=h/2-r+Math.sin(a)*r;}
+    else if((s-=Math.PI*r/2)<h-2*r){x=-w/2;y=h/2-r-s;}
+    else{const a=Math.PI+ (s-(h-2*r))/r;x=-w/2+r+Math.cos(a)*r;y=-h/2+r+Math.sin(a)*r;}
+    pts.push([x,y]);
+  }
+  // lugs (top and bottom)
+  const lugCount=Math.floor(n*0.1);
+  for(let i=0;i<lugCount;i++){
+    const t=i/lugCount;
+    pts.push([-w/2+t*w*0.3-10*scale,-h/2-15*scale+Math.sin(t*Math.PI)*(-5*scale)]);
+    pts.push([w/2-t*w*0.3+10*scale,-h/2-15*scale+Math.sin(t*Math.PI)*(-5*scale)]);
+    pts.push([-w/2+t*w*0.3-10*scale,h/2+15*scale-Math.sin(t*Math.PI)*(-5*scale)]);
+    pts.push([w/2-t*w*0.3+10*scale,h/2+15*scale-Math.sin(t*Math.PI)*(-5*scale)]);
+  }
+  // crown
+  pts.push([w/2+5*scale,0]);
+  pts.push([w/2+10*scale,-5*scale]);
+  pts.push([w/2+10*scale,5*scale]);
+  // hands
+  for(let i=0;i<20;i++){pts.push([0,-i*3*scale]);}
+  for(let i=0;i<14;i++){pts.push([i*3*scale,0]);}
+  return pts;
+}
+let watchPts=null;
+
+function draw(){
+  const t=(performance.now()-START)/1000;
+  ctx.fillStyle='#000';
+  ctx.fillRect(0,0,W,H);
+  ctx.save();
+  ctx.translate(cx,cy);
+  
+  const unit=Math.min(W,H)/DPR;
+  const s=Math.min(W,H)/800; // scale factor
+  ctx.scale(DPR,DPR);
+  ctx.scale(1/DPR*s*DPR/s,1/DPR*s*DPR/s);
+  // simpler: reset
+  ctx.setTransform(1,0,0,1,cx,cy);
+  const S=Math.min(W,H)/800;
+  ctx.scale(S,S);
+
+  ctx.strokeStyle='#fff';
+  ctx.fillStyle='#fff';
+  ctx.lineCap='round';
+  ctx.lineJoin='round';
+
+  if(t<1){
+    // ORIGIN
+    const lt=t;
+    // dot
+    const dotR=4+Math.sin(lt*Math.PI)*1;
+    ctx.beginPath();ctx.arc(0,0,dotR,0,Math.PI*2);ctx.fill();
+    // ripples
+    for(let i=0;i<3;i++){
+      const p=clamp(lt*1.5-i*0.15,0,1);
+      if(p>0&&p<1){
+        ctx.globalAlpha=1-p;
+        ctx.lineWidth=1.5;
+        ctx.beginPath();ctx.arc(0,0,p*200,0,Math.PI*2);ctx.stroke();
+      }
+    }
+    ctx.globalAlpha=1;
+  } else if(t<2){
+    // LINE
+    const lt=(t-1);
+    const e=easeOut(lt);
+    const len=e*Math.max(W,H)/S;
+    ctx.lineWidth=2;
+    ctx.beginPath();
+    ctx.moveTo(-len/2,0);ctx.lineTo(len/2,0);
+    ctx.stroke();
+  } else if(t<4){
+    // GRID -> CIRCLE
+    const lt=(t-2)/2;
+    const gridAppear=clamp(lt*2.5,0,1); // 0..0.4
+    const morph=clamp((lt-0.4)/0.6,0,1);
+    const em=easeInOut(morph);
+    const rot=em*Math.PI*0.5;
+    const R=180;
+    ctx.lineWidth=1.5;
+    ctx.save();
+    ctx.rotate(rot*0.5);
+    const lineMax=Math.max(W,H)/S;
+    // 9 horizontal, 9 vertical
+    for(let i=0;i<9;i++){
+      const off=(i-4)*45;
+      const appear=clamp(gridAppear*9 - i*0.3,0,1);
+      if(appear<=0)continue;
+      ctx.globalAlpha=appear*(1-em*0.3);
+      // horizontal line morphs toward circle arc
+      // sample points
+      ctx.beginPath();
+      const segs=40;
+      for(let j=0;j<=segs;j++){
+        const u=j/segs;
+        const lx=(u-0.5)*lineMax;
+        const ly=off;
+        // target: circle of radius R, angle based on off
+        const ang=Math.asin(clamp(off/R,-1,1));
+        const tx=Math.cos(ang+ (u-0.5)*Math.PI*2* (1-Math.abs(off)/R) *0.5 )*R;
+        // simpler: bend line into arc
+        const bend=em;
+        const cxp=0;
+        // use lerp with curve
+        const curveY=off*(1-bend*clamp(1-Math.abs(lx)/300,0,1)*0.3);
+        const clampedLx=lx*(1-bend*clamp(Math.abs(lx)/400,0,1));
+        // interpolate to circle
+        const angle=Math.atan2(off,lx||0.001);
+        const circleX=Math.cos(u*Math.PI*2)*R;
+        const circleY=Math.sin(u*Math.PI*2)*R;
+        // Better: morph each horizontal line to arc at height off
+        let fx,fy;
+        if(Math.abs(off)<R){
+          const halfChord=Math.sqrt(R*R-off*off);
+          const tLineX=(u-0.5)*2*halfChord;
+          const tLineY=off;
+          fx=lx*(1-em)+tLineX*em;
+          fy=off;
+        } else {
+          fx=lx*(1-em);
+          fy=off*(1-em);
+        }
+        if(j===0)ctx.moveTo(fx,fy);else ctx.lineTo(fx,fy);
+      }
+      ctx.stroke();
+    }
+    // vertical lines
+    for(let i=0;i<9;i++){
+      const off=(i-4)*45;
+      const appear=clamp(gridAppear*9 - i*0.3 - 0.2,0,1);
+      if(appear<=0)continue;
+      ctx.globalAlpha=appear*(1-em*0.3);
+      ctx.beginPath();
+      const segs=40;
+      for(let j=0;j<=segs;j++){
+        const u=j/segs;
+        const ly=(u-0.5)*lineMax;
+        let fx,fy;
+        if(Math.abs(off)<R){
+          const halfChord=Math.sqrt(R*R-off*off);
+          const tLineY=(u-0.5)*2*halfChord;
+          fx=off;
+          fy=ly*(1-em)+tLineY*em;
+        } else {
+          fx=off*(1-em);
+          fy=ly*(1-em);
+        }
+        if(j===0)ctx.moveTo(fx,fy);else ctx.lineTo(fx,fy);
+      }
+      ctx.stroke();
+    }
+    ctx.globalAlpha=1;
+    // final circle
+    if(em>0.8){
+      ctx.globalAlpha=(em-0.8)/0.2;
+      ctx.lineWidth=2;
+      ctx.beginPath();ctx.arc(0,0,R,0,Math.PI*2);ctx.stroke();
+      ctx.globalAlpha=1;
+    }
+    ctx.restore();
+  } else if(t<6){
+    // WIREFRAME -> SOLID SPHERE
+    const lt=(t-4)/2;
+    const R=180;
+    const rotY=lt*Math.PI*0.8;
+    const fillAmt=clamp((lt-0.5)/0.5,0,1);
+    const ef=easeInOut(fillAmt);
+    
+    // wireframe
+    ctx.lineWidth=1.2;
+    ctx.globalAlpha=1-ef*0.7;
+    // meridians
+    for(let i=0;i<8;i++){
+      const phi=i/8*Math.PI*2 + rotY;
+      ctx.beginPath();
+      for(let j=0;j<=60;j++){
+        const th=j/60*Math.PI-Math.PI/2;
+        const x=R*Math.cos(th)*Math.sin(phi);
+        const y=R*Math.sin(th);
+        const z=R*Math.cos(th)*Math.cos(phi);
+        ctx.globalAlpha=(1-ef*0.7)*(0.3+0.7*(z+R)/(2*R));
+        if(j===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+      }
+      ctx.stroke();
+    }
+    // parallels
+    for(let i=1;i<8;i++){
+      const th=i/8*Math.PI-Math.PI/2;
+      const rr=R*Math.cos(th);
+      const yy=R*Math.sin(th);
+      ctx.globalAlpha=(1-ef*0.7)*0.7;
+      ctx.beginPath();
+      for(let j=0;j<=60;j++){
+        const a=j/60*Math.PI*2+rotY;
+        const x=rr*Math.cos(a);
+        const z=rr*Math.sin(a);
+        if(j===0)ctx.moveTo(x,yy);else ctx.lineTo(x,yy);
+      }
+      ctx.stroke();
+    }
+    ctx.globalAlpha=1;
+    // solid fill
+    if(ef>0){
+      const grad=ctx.createRadialGradient(-R*0.4,-R*0.4,R*0.1,0,0,R);
+      grad.addColorStop(0,`rgba(255,255,255,${ef})`);
+      grad.addColorStop(0.7,`rgba(240,240,240,${ef})`);
+      grad.addColorStop(1,`rgba(200,200,200,${ef})`);
+      ctx.fillStyle=grad;
+      ctx.beginPath();ctx.arc(0,0,R,0,Math.PI*2);ctx.fill();
+      // highlight
+      if(ef>0.5){
+        const hg=ctx.createRadialGradient(-R*0.35,-R*0.4,0,-R*0.35,-R*0.4,R*0.5);
+        hg.addColorStop(0,`rgba(255,255,255,${(ef-0.5)*2})`);
+        hg.addColorStop(1,'rgba(255,255,255,0)');
+        ctx.fillStyle=hg;
+        ctx.beginPath();ctx.arc(0,0,R,0,Math.PI*2);ctx.fill();
+      }
+      ctx.fillStyle='#fff';
+    }
+  } else if(t<8){
+    // INTERFACE
+    const lt=(t-6)/2;
+    const e=easeInOut(clamp(lt*1.5,0,1));
+    // sphere flattens to rectangle
+    const R=180;
+    const w=220, h=380;
+    const cw=R*(1-e)+w*e;
+    const ch=R*(1-e)+h*e;
+    const rr=R*(1-e)+30*e;
+    
+    ctx.lineWidth=2;
+    ctx.strokeStyle='#fff';
+    ctx.beginPath();
+    roundRect(ctx,-cw/2,-ch/2,cw,ch,rr);
+    ctx.stroke();
+    
+    // UI elements appear
+    if(lt>0.5){
+      const ui=clamp((lt-0.5)/0.4,0,1);
+      ctx.globalAlpha=ui;
+      ctx.lineWidth=1.5;
+      // status bar
+      ctx.beginPath();
+      ctx.moveTo(-w/2+30,-h/2+30);ctx.lineTo(-w/2+70,-h/2+30);
+      ctx.moveTo(w/2-70,-h/2+30);ctx.lineTo(w/2-30,-h/2+30);
+      ctx.stroke();
+      // app grid
+      for(let r=0;r<4;r++){
+        for(let c=0;c<3;c++){
+          const x=-w/2+50+c*60;
+          const y=-h/2+80+r*70;
+          ctx.beginPath();
+          roundRect(ctx,x-20,y-20,40,40,8);
+          ctx.stroke();
+        }
+      }
+      // home indicator
+      ctx.lineWidth=3;
+      ctx.beginPath();
+      ctx.moveTo(-30,h/2-20);ctx.lineTo(30,h/2-20);
+      ctx.stroke();
+      ctx.globalAlpha=1;
+    }
+  } else if(t<10){
+    // CUBE -> BLOOM
+    const lt=(t-8)/2;
+    const foldPhase=clamp(lt/0.3,0,1);
+    const cubePhase=clamp((lt-0.2)/0.3,0,1);
+    const bloomPhase=clamp((lt-0.5)/0.5,0,1);
+    const eb=easeInOut(bloomPhase);
+    
+    const rotX=0.5+cubePhase*Math.PI*2;
+    const rotY=0.5+cubePhase*Math.PI*0.5;
+    
+    // draw cube wireframe
+    const cs=120;
+    const verts=[
+      [-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],
+      [-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]
+    ].map(v=>v.map(x=>x*cs));
+    
+    function project(v){
+      let [x,y,z]=v;
+      // rotate Y
+      let x1=x*Math.cos(rotY)+z*Math.sin(rotY);
+      let z1=-x*Math.sin(rotY)+z*Math.cos(rotY);
+      // rotate X
+      let y1=y*Math.cos(rotX)-z1*Math.sin(rotX);
+      let z2=y*Math.sin(rotX)+z1*Math.cos(rotX);
+      return [x1,y1,z2];
+    }
+    
+    const edges=[[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]];
+    const cubeAlpha=(1-eb)*clamp(lt*3,0,1);
+    if(cubeAlpha>0){
+      ctx.globalAlpha=cubeAlpha;
+      ctx.lineWidth=1.8;
+      for(const [a,b] of edges){
+        const p1=project(verts[a]);
+        const p2=project(verts[b]);
+        ctx.beginPath();
+        ctx.moveTo(p1[0],p1[1]);ctx.lineTo(p2[0],p2[1]);
+        ctx.stroke();
+      }
+      ctx.globalAlpha=1;
+    }
+    
+    // bloom: 6 petals
+    if(eb>0){
+      ctx.globalAlpha=eb;
+      const dist=30+eb*150;
+      const pw=40+eb*60;
+      const ph=80+eb*100;
+      const dirs=[[0,-1],[0,1],[-1,0],[1,0],[-0.7,-0.7],[0.7,0.7]];
+      for(let i=0;i<6;i++){
+        const [dx,dy]=dirs[i];
+        const ang=Math.atan2(dy,dx);
+        ctx.save();
+        ctx.rotate(ang+eb*0.3);
+        ctx.translate(dist,0);
+        ctx.beginPath();
+        ctx.ellipse(0,0,ph,pw,0,0,Math.PI*2);
+        ctx.fill();
+        ctx.restore();
+      }
+      ctx.globalAlpha=1;
+    }
+  } else if(t<12){
+    // VORTEX
+    const lt=(t-10)/2;
+    const dt=0.016;
+    ctx.fillStyle='#fff';
+    for(const p of particles){
+      p.a+=p.speed*dt;
+      p.flicker+=dt*3;
+      const x=Math.cos(p.a)*p.r*p.ecc;
+      const y=Math.sin(p.a)*p.r;
+      const flick=0.6+0.4*Math.sin(p.flicker);
+      ctx.globalAlpha=flick;
+      ctx.beginPath();
+      ctx.arc(x,y,1.2,0,Math.PI*2);
+      ctx.fill();
+    }
+    ctx.globalAlpha=1;
+  } else if(t<13){
+    // WATCH
+    const lt=(t-12);
+    const e=easeInOut(lt);
+    if(!watchPts)watchPts=watchTargets(particles.length,1);
+    // assign targets
+    for(let i=0;i<particles.length;i++){
+      const p=particles[i];
+      const tg=watchPts[i%watchPts.length];
+      if(p.tx===0&&p.ty===0){p.tx=tg[0];p.ty=tg[1];}
+      p.tx=tg[0];p.ty=tg[1];
+      const x0=Math.cos(p.a)*p.r*p.ecc;
+      const y0=Math.sin(p.a)*p.r;
+      const x=x0*(1-e)+p.tx*e;
+      const y=y0*(1-e)+p.ty*e;
+      ctx.globalAlpha=0.8+0.2*Math.sin(p.flicker+lt*5);
+      ctx.beginPath();ctx.arc(x,y,1.3,0,Math.PI*2);ctx.fill();
+    }
+    ctx.globalAlpha=1;
+  } else if(t<14){
+    // COLLAPSE
+    const lt=(t-13);
+    const e=easeIn(lt);
+    // ribbon compress into sphere then point
+    const ribbonPhase=clamp(lt/0.5,0,1);
+    const collapsePhase=clamp((lt-0.5)/0.5,0,1);
+    
+    if(collapsePhase<1){
+      // draw flowing ribbons
+      ctx.globalAlpha=1-collapsePhase;
+      ctx.strokeStyle='#fff';
+      ctx.lineWidth=2;
+      const R=150*(1-ribbonPhase*0.6);
+      for(let i=0;i<8;i++){
+        ctx.beginPath();
+        for(let j=0;j<=50;j++){
+          const u=j/50;
+          const ang=u*Math.PI*4+i*Math.PI/4+lt*5;
+          const rr=R*(1-u*ribbonPhase);
+          const x=Math.cos(ang)*rr;
+          const y=Math.sin(ang)*rr*0.5;
+          if(j===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+        }
+        ctx.stroke();
+      }
+      ctx.globalAlpha=1;
+    }
+    // bright sphere
+    const sphereR=(1-collapsePhase)*40+collapsePhase*60;
+    const pulse=collapsePhase<0.7?1:1+Math.sin((collapsePhase-0.7)/0.3*Math.PI)*0.5;
+    const finalR=collapsePhase>0.85?(1-(collapsePhase-0.85)/0.15)*sphereR*pulse:sphereR*pulse;
+    if(ribbonPhase>0.3){
+      const a=clamp((ribbonPhase-0.3)/0.7,0,1);
+      const g=ctx.createRadialGradient(0,0,0,0,0,finalR*2);
+      g.addColorStop(0,`rgba(255,255,255,${a})`);
+      g.addColorStop(0.3,`rgba(255,255,255,${a*0.8})`);
+      g.addColorStop(1,'rgba(255,255,255,0)');
+      ctx.fillStyle=g;
+      ctx.beginPath();ctx.arc(0,0,finalR*2,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='#fff';
+      ctx.beginPath();ctx.arc(0,0,Math.max(finalR*0.5,2),0,Math.PI*2);ctx.fill();
+    }
+  } else {
+    // LOGO
+    const lt=clamp(t-14,0,1);
+    const hold=clamp(lt/0.15,0,1);
+    const expand=clamp((lt-0.15)/0.3,0,1);
+    const glow=clamp((lt-0.4)/0.4,0,1);
+    
+    // bright point
+    if(expand<1){
+      const a=1-expand;
+      ctx.fillStyle='#fff';
+      ctx.beginPath();ctx.arc(0,0,3+a*2,0,Math.PI*2);ctx.fill();
+      const g=ctx.createRadialGradient(0,0,0,0,0,30);
+      g.addColorStop(0,`rgba(255,255,255,${a})`);
+      g.addColorStop(1,'rgba(255,255,255,0)');
+      ctx.fillStyle=g;
+      ctx.beginPath();ctx.arc(0,0,30,0,Math.PI*2);ctx.fill();
+    }
+    
+    // amber glow
+    if(glow>0){
+      const gp=Math.sin(glow*Math.PI);
+      const g=ctx.createRadialGradient(0,0,0,0,0,400);
+      g.addColorStop(0,`rgba(255,180,80,${gp*0.5})`);
+      g.addColorStop(0.3,`rgba(255,160,60,${gp*0.25})`);
+      g.addColorStop(1,'rgba(255,140,40,0)');
+      ctx.fillStyle=g;
+      ctx.beginPath();ctx.arc(0,0,400,0,Math.PI*2);ctx.fill();
+    }
+    
+    // logo text
+    if(expand>0){
+      ctx.globalAlpha=expand;
+      ctx.fillStyle='#fff';
+      ctx.font='300 48px "Helvetica Neue", Arial, sans-serif';
+      ctx.textAlign='center';
+      ctx.textBaseline='middle';
+      ctx.letterSpacing='8px';
+      ctx.fillText('AETHER',0,0);
+      // underline
+      ctx.strokeStyle='#fff';
+      ctx.lineWidth=1;
+      ctx.globalAlpha=expand*0.6;
+      ctx.beginPath();ctx.moveTo(-80,25);ctx.lineTo(80,25);ctx.stroke();
+      ctx.globalAlpha=1;
+    }
+  }
+  
+  ctx.restore();
+  requestAnimationFrame(draw);
+}
+
+function roundRect(ctx,x,y,w,h,r){
+  ctx.moveTo(x+r,y);
+  ctx.lineTo(x+w-r,y);
+  ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r);
+  ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx.lineTo(x+r,y+h);
+  ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r);
+  ctx.quadraticCurveTo(x,y,x+r,y);
+}
+
+draw();
+</script>
+</body>
+</html>

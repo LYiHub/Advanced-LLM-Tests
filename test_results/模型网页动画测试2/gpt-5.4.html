@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Minimal Motion Sequence</title>
+<style>
+  html, body {
+    margin: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #000;
+  }
+  canvas {
+    display: block;
+    width: 100vw;
+    height: 100vh;
+    background: #000;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+(() => {
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+
+  let DPR = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+  let W = 0, H = 0, CX = 0, CY = 0, SCALE = 0;
+  const DURATION = 15;
+
+  function resize() {
+    DPR = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+    canvas.width = Math.floor(innerWidth * DPR);
+    canvas.height = Math.floor(innerHeight * DPR);
+    canvas.style.width = innerWidth + 'px';
+    canvas.style.height = innerHeight + 'px';
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    W = innerWidth;
+    H = innerHeight;
+    CX = W / 2;
+    CY = H / 2;
+    SCALE = Math.min(W, H);
+  }
+  addEventListener('resize', resize);
+  resize();
+
+  const TAU = Math.PI * 2;
+
+  function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function easeInOut(t) { return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3)/2; }
+  function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
+  function easeInCubic(t) { return t*t*t; }
+  function easeOutExpo(t) { return t === 1 ? 1 : 1 - Math.pow(2, -10*t); }
+  function smoothstep(a, b, x) {
+    let t = clamp((x - a) / (b - a), 0, 1);
+    return t * t * (3 - 2 * t);
+  }
+  function fract(x) { return x - Math.floor(x); }
+  function hash(n) { return fract(Math.sin(n * 127.1) * 43758.5453123); }
+
+  const particles = [];
+  const PCOUNT = 280;
+  for (let i = 0; i < PCOUNT; i++) {
+    const a = TAU * hash(i + 0.13);
+    const b = TAU * hash(i * 1.37 + 2.1);
+    const r = 0.15 + 0.85 * hash(i * 2.71 + 8.4);
+    const ring = (i % 2 === 0) ? 1 : -1;
+    particles.push({
+      a0: a,
+      b0: b,
+      r0: r,
+      dir: ring,
+      tw: hash(i * 8.1 + 1.9),
+      size: 0.8 + 1.8 * hash(i * 5.7 + 9.2)
+    });
+  }
+
+  const watchTargets = [];
+  function buildWatchTargets() {
+    watchTargets.length = 0;
+    const rw = SCALE * 0.17;
+    const rh = SCALE * 0.22;
+    const rr = SCALE * 0.035;
+    const lugW = SCALE * 0.035;
+    const lugH = SCALE * 0.03;
+    const nBody = 180;
+    const nLugs = 50;
+
+    function roundedRectPoints(x, y, w, h, r, n) {
+      const pts = [];
+      const corners = [
+        {cx:x+w-r, cy:y+r, a0:-Math.PI/2, a1:0},
+        {cx:x+w-r, cy:y+h-r, a0:0, a1:Math.PI/2},
+        {cx:x+r, cy:y+h-r, a0:Math.PI/2, a1:Math.PI},
+        {cx:x+r, cy:y+r, a0:Math.PI, a1:Math.PI*1.5},
+      ];
+      const per = Math.floor(n / 8);
+      for (let i = 0; i < per*2; i++) pts.push({x:x+r + (w-2*r)*(i/(per*2-1)), y:y});
+      for (let k = 0; k < corners.length; k++) {
+        const c = corners[k];
+        for (let i = 0; i < per; i++) {
+          const t = i / Math.max(1, per - 1);
+          const a = lerp(c.a0, c.a1, t);
+          pts.push({x:c.cx + Math.cos(a)*r, y:c.cy + Math.sin(a)*r});
+        }
+        const x1 = [x+w, x+w, x+r, x][k];
+        const y1 = [y+r, y+h-r, y+h, y+h-r][k];
+        const x2 = [x+w, x+w-r, x, x][k];
+        const y2 = [y+h-r, y+h, y+h-r, y+r][k];
+        for (let i = 0; i < per*2; i++) {
+          const t = i / Math.max(1, per*2 - 1);
+          pts.push({x:lerp(x1,x2,t), y:lerp(y1,y2,t)});
+        }
+      }
+      return pts.slice(0, n);
+    }
+
+    const body = roundedRectPoints(-rw, -rh, rw*2, rh*2, rr, nBody);
+    body.forEach(p => watchTargets.push(p));
+
+    for (let i = 0; i < nLugs/2; i++) {
+      const t = i / (nLugs/2 - 1);
+      watchTargets.push({x: lerp(-rw*0.45, -rw*0.15, t), y: -rh - lugH});
+      watchTargets.push({x: lerp(rw*0.15, rw*0.45, t), y: -rh - lugH});
+      watchTargets.push({x: lerp(-rw*0.45, -rw*0.15, t), y: rh + lugH});
+      watchTargets.push({x: lerp(rw*0.15, rw*0.45, t), y: rh + lugH});
+    }
+    while (watchTargets.length < PCOUNT) {
+      const idx = watchTargets.length % body.length;
+      watchTargets.push(body[idx]);
+    }
+    watchTargets.length = PCOUNT;
+  }
+  buildWatchTargets();
+
+  function drawCircle(x, y, r, alpha=1) {
+    ctx.globalAlpha = alpha;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, TAU);
+    ctx.fillStyle = '#fff';
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  function drawRing(x, y, r, w, alpha=1) {
+    ctx.globalAlpha = alpha;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, TAU);
+    ctx.lineWidth = w;
+    ctx.strokeStyle = '#fff';
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
+  function drawOrigin(t) {
+    const p = clamp(t / 1, 0, 1);
+    const dotR = SCALE * 0.006 * (1 + 0.35*Math.sin(Math.min(1,p)*Math.PI));
+    drawCircle(CX, CY, dotR, 1);
+
+    for (let i = 0; i < 3; i++) {
+      const st = i * 0.09;
+      const rp = clamp((p - st) / 0.65, 0, 1);
+      if (rp > 0) {
+        const r = SCALE * (0.02 + 0.12 * easeOutCubic(rp));
+        const a = (1 - rp) * 0.85;
+        drawRing(CX, CY, r, Math.max(1, SCALE * 0.0014), a);
+      }
+    }
+  }
+
+  function drawLine(t) {
+    const p = clamp((t - 1) / 1, 0, 1);
+    const len = lerp(SCALE * 0.01, W * 0.86, easeOutExpo(p));
+    const y = CY;
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = Math.max(1, SCALE * 0.0015);
+    ctx.beginPath();
+    ctx.moveTo(CX - len / 2, y);
+    ctx.lineTo(CX + len / 2, y);
+    ctx.stroke();
+    drawCircle(CX, CY, SCALE * 0.0035, 0.95);
+  }
+
+  function drawGridToCircle(t) {
+    const p = clamp((t - 2) / 2, 0, 1);
+    const appear = smoothstep(0, 0.25, p);
+    const morph = smoothstep(0.25, 1, p);
+    const rotate = morph * Math.PI * 0.5;
+    const half = SCALE * 0.18;
+    const lines = 9;
+
+    ctx.save();
+    ctx.translate(CX, CY);
+    ctx.rotate(rotate);
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = Math.max(1, SCALE * 0.0014);
+    ctx.beginPath();
+
+    function mapPoint(x, y, isH) {
+      const d = isH ? Math.abs(y)/half : Math.abs(x)/half;
+      const inward = 1 - d;
+      const curveAmt = morph * half * 0.95;
+      let nx = x, ny = y;
+      if (isH) {
+        ny = y * (1 - 0.15*morph);
+        nx = x;
+        const s = x / half;
+        const sign = y >= 0 ? 1 : -1;
+        ny += sign * curveAmt * (s*s) * 0.22 * (0.2 + 0.8*d);
+        nx *= (1 - 0.2*morph*d);
+      } else {
+        nx = x * (1 - 0.15*morph);
+        ny = y;
+        const s = y / half;
+        const sign = x >= 0 ? 1 : -1;
+        nx += sign * curveAmt * (s*s) * 0.22 * (0.2 + 0.8*d);
+        ny *= (1 - 0.2*morph*d);
+      }
+
+      const ang = Math.atan2(ny, nx);
+      const rad = Math.hypot(nx, ny);
+      const targetR = half * (0.2 + 0.8*inward);
+      const blend = Math.pow(clamp((Math.abs(isH?y:x)/half),0,1), 1.4) * morph;
+      const mx = lerp(nx, Math.cos(ang) * targetR, blend);
+      const my = lerp(ny, Math.sin(ang) * targetR, blend);
+      return {x: mx, y: my};
+    }
+
+    for (let i = 0; i < lines; i++) {
+      const a = (i / (lines - 1)) * 2 - 1;
+      const delay = i * 0.03;
+      const vis = clamp((appear - delay) / 0.3, 0, 1);
+      if (vis <= 0) continue;
+      const y = a * half;
+      for (let s = 0; s <= 64; s++) {
+        const x = lerp(-half, half, s / 64);
+        const pnt = mapPoint(x, y, true);
+        if (s === 0) ctx.moveTo(pnt.x, pnt.y);
+        else ctx.lineTo(pnt.x, pnt.y);
+      }
+    }
+
+    for (let i = 0; i < lines; i++) {
+      const a = (i / (lines - 1)) * 2 - 1;
+      const delay = 0.12 + i * 0.03;
+      const vis = clamp((appear - delay) / 0.3, 0, 1);
+      if (vis <= 0) continue;
+      const x = a * half;
+      for (let s = 0; s <= 64; s++) {
+        const y = lerp(-half, half, s / 64);
+        const pnt = mapPoint(x, y, false);
+        if (s === 0) ctx.moveTo(pnt.x, pnt.y);
+        else ctx.lineTo(pnt.x, pnt.y);
+      }
+    }
+    ctx.stroke();
+
+    const circleAlpha = smoothstep(0.7, 1, p);
+    if (circleAlpha > 0) {
+      drawRing(0, 0, half, Math.max(1, SCALE * 0.0016), circleAlpha);
+    }
+    ctx.restore();
+  }
+
+  function drawSphere(t) {
+    const p = clamp((t - 4) / 2, 0, 1);
+    const wire = 1 - smoothstep(0.48, 0.92, p);
+    const solid = smoothstep(0.35, 0.92, p);
+    const R = SCALE * 0.17;
+    const rot = p * Math.PI * 0.9;
+
+    ctx.save();
+    ctx.translate(CX, CY);
+
+    if (solid > 0) {
+      const grad = ctx.createRadialGradient(-R*0.25, -R*0.3, R*0.05, 0, 0, R);
+      grad.addColorStop(0, 'rgba(255,255,255,1)');
+      grad.addColorStop(0.82, 'rgba(255,255,255,1)');
+      grad.addColorStop(1, 'rgba(255,255,255,1)');
+      ctx.globalAlpha = solid;
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(0, 0, R, 0, TAU);
+      ctx.fill();
+
+      const hg = ctx.createRadialGradient(-R*0.35, -R*0.35, R*0.02, -R*0.35, -R*0.35, R*0.32);
+      hg.addColorStop(0, `rgba(255,255,255,${0.95*solid})`);
+      hg.addColorStop(0.45, `rgba(255,255,255,${0.32*solid})`);
+      hg.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = hg;
+      ctx.beginPath();
+      ctx.arc(-R*0.22, -R*0.22, R*0.5, 0, TAU);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+
+    if (wire > 0.02) {
+      ctx.globalAlpha = wire;
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = Math.max(1, SCALE * 0.0012);
+
+      const latCount = 9;
+      for (let i = 0; i < latCount; i++) {
+        const v = (i / (latCount - 1)) * 2 - 1;
+        const ry = v * R;
+        const rx = Math.sqrt(Math.max(0, R*R - ry*ry));
+        const squash = 0.42 + 0.58 * Math.abs(Math.cos(rot));
+        ctx.beginPath();
+        ctx.ellipse(0, ry*0.02, rx * squash, rx, 0, 0, TAU);
+        ctx.stroke();
+      }
+
+      const lonCount = 11;
+      for (let i = 0; i < lonCount; i++) {
+        const a = rot + (i / lonCount) * TAU;
+        const sx = Math.cos(a);
+        const ex = Math.abs(sx);
+        ctx.beginPath();
+        ctx.ellipse(0, 0, R * Math.max(0.08, ex), R, 0, 0, TAU);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+    }
+    ctx.restore();
+  }
+
+  function roundedRectPath(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function drawInterface(t) {
+    const p = clamp((t - 6) / 2, 0, 1);
+    const R = SCALE * 0.17;
+    const phoneW = SCALE * 0.26;
+    const phoneH = SCALE * 0.47;
+    const rr = SCALE * 0.03;
+    const flatten = easeInOut(p);
+
+    ctx.save();
+    ctx.translate(CX, CY);
+    const fromScaleX = lerp(1, phoneW/(R*2), flatten);
+    const fromScaleY = lerp(1, phoneH/(R*2), flatten);
+    const fromRound = lerp(R, rr, flatten);
+
+    roundedRectPath(-R*fromScaleX, -R*fromScaleY, 2*R*fromScaleX, 2*R*fromScaleY, fromRound);
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = Math.max(1, SCALE * 0.0018);
+    ctx.stroke();
+
+    const uiAlpha = smoothstep(0.35, 1, p);
+    if (uiAlpha > 0) {
+      ctx.globalAlpha = uiAlpha;
+      const x = -phoneW/2, y = -phoneH/2;
+
+      ctx.lineWidth = Math.max(1, SCALE * 0.0014);
+      ctx.beginPath();
+      ctx.moveTo(x + phoneW*0.08, y + phoneH*0.08);
+      ctx.lineTo(x + phoneW*0.18, y + phoneH*0.08);
+      ctx.moveTo(x + phoneW*0.74, y + phoneH*0.08);
+      ctx.lineTo(x + phoneW*0.92, y + phoneH*0.08);
+      ctx.stroke();
+
+      const cols = 3, rows = 3;
+      const iw = phoneW * 0.18;
+      const gapX = phoneW * 0.095;
+      const gapY = phoneH * 0.08;
+      const startX = x + phoneW*0.13;
+      const startY = y + phoneH*0.2;
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          roundedRectPath(startX + c*(iw+gapX), startY + r*(iw+gapY), iw, iw, iw*0.28);
+          ctx.stroke();
+        }
+      }
+
+      ctx.beginPath();
+      ctx.moveTo(-phoneW*0.12, phoneH*0.39);
+      ctx.lineTo(phoneW*0.12, phoneH*0.39);
+      ctx.lineCap = 'round';
+      ctx.stroke();
+      ctx.lineCap = 'butt';
+      ctx.globalAlpha = 1;
+    }
+    ctx.restore();
+  }
+
+  function projectIso(x, y, z) {
+    const angY = Math.PI/4;
+    const angX = Math.atan(Math.sqrt(1/2));
+    let x1 = x*Math.cos(angY) + z*Math.sin(angY);
+    let z1 = -x*Math.sin(angY) + z*Math.cos(angY);
+    let y1 = y*Math.cos(angX) - z1*Math.sin(angX);
+    return {x:x1, y:y1};
+  }
+
+  function drawCubeBloom(t) {
+    const p = clamp((t - 8) / 2, 0, 1);
+    const fold = smoothstep(0, 0.28, p);
+    const cubeP = smoothstep(0.15, 0.52, p);
+    const bloom = smoothstep(0.48, 1, p);
+
+    const phoneW = SCALE * 0.26;
+    const phoneH = SCALE * 0.47;
+    const side = lerp(phoneW, SCALE * 0.18, cubeP);
+    const rot = cubeP * Math.PI * 2;
+
+    ctx.save();
+    ctx.translate(CX, CY);
+
+    if (fold < 0.45) {
+      const a = 1 - smoothstep(0.2, 0.45, fold);
+      ctx.globalAlpha = a;
+      roundedRectPath(-phoneW/2, -phoneH/2, phoneW, phoneH, SCALE*0.03);
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = Math.max(1, SCALE * 0.0016);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+
+    const cubeAlpha = 1 - smoothstep(0.7, 1, bloom);
+    if (cubeAlpha > 0.01) {
+      ctx.globalAlpha = cubeAlpha;
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = Math.max(1, SCALE * 0.0015);
+
+      const verts = [
+        [-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],
+        [-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]
+      ].map(v => {
+        const x=v[0]*side*0.7, y=v[1]*side*0.7, z=v[2]*side*0.7;
+        const ca=Math.cos(rot), sa=Math.sin(rot);
+        const xr=x*ca-z*sa, zr=x*sa+z*ca;
+        const p2=projectIso(xr,y,zr);
+        return p2;
+      });
+      const edges = [[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]];
+      ctx.beginPath();
+      for (const e of edges) {
+        ctx.moveTo(verts[e[0]].x, verts[e[0]].y);
+        ctx.lineTo(verts[e[1]].x, verts[e[1]].y);
+      }
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+
+    if (bloom > 0.02) {
+      const petals = 6;
+      const baseR = SCALE * 0.07;
+      for (let i = 0; i < petals; i++) {
+        const a = i / petals * TAU + rot*0.22;
+        const dist = lerp(0, SCALE*0.13, easeOutCubic(bloom));
+        const px = Math.cos(a)*dist;
+        const py = Math.sin(a)*dist*0.8;
+        const rx = lerp(side*0.2, SCALE*0.055, bloom);
+        const ry = lerp(side*0.12, SCALE*0.105, bloom);
+        ctx.save();
+        ctx.translate(CX + px - CX, CY + py - CY);
+        ctx.rotate(a + Math.PI/2);
+        ctx.globalAlpha = bloom;
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.ellipse(0, 0, rx, ry, 0, 0, TAU);
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+    ctx.restore();
+  }
+
+  function drawVortex(t) {
+    const p = clamp((t - 10) / 2, 0, 1);
+    const alpha = smoothstep(0, 0.2, p) * (1 - smoothstep(0.85, 1, p));
+    const swirl = easeInOut(p);
+    const rx = SCALE * 0.24;
+    const ry = SCALE * 0.14;
+
+    for (let i = 0; i < particles.length; i++) {
+      const pt = particles[i];
+      const r = pt.r0;
+      const a = pt.a0 + pt.dir * swirl * (5.5 + r*3.0) + Math.sin(swirl*TAU + pt.b0) * 0.2;
+      const x = CX + Math.cos(a) * rx * r;
+      const y = CY + Math.sin(a + pt.b0*0.2) * ry * (0.35 + 0.65*r);
+      const tw = 0.55 + 0.45 * Math.sin((t*5 + pt.tw*TAU));
+      drawCircle(x, y, pt.size, alpha * tw);
+    }
+  }
+
+  function drawWatch(t) {
+    const p = clamp((t - 12) / 1, 0, 1);
+    const settle = easeOutCubic(p);
+
+    for (let i = 0; i < particles.length; i++) {
+      const pt = particles[i];
+      const r = pt.r0;
+      const a = pt.a0 + pt.dir * (1 - p) * (5.5 + r*3.0) + Math.sin((1-p)*TAU + pt.b0) * 0.2;
+      const sx = CX + Math.cos(a) * SCALE*0.24 * r;
+      const sy = CY + Math.sin(a + pt.b0*0.2) * SCALE*0.14 * (0.35 + 0.65*r);
+      const tx = CX + watchTargets[i].x;
+      const ty = CY + watchTargets[i].y;
+      const x = lerp(sx, tx, settle);
+      const y = lerp(sy, ty, settle);
+      const al = lerp(0.4, 1, settle);
+      drawCircle(x, y, 1.1, al);
+    }
+  }
+
+  function drawCollapse(t) {
+    const p = clamp((t - 13) / 1, 0, 1);
+    const ribbon = 1 - smoothstep(0.45, 0.8, p);
+    const collapse = smoothstep(0.18, 1, p);
+    const pulse = Math.exp(-Math.pow((p - 0.65) / 0.13, 2));
+
+    ctx.save();
+    ctx.translate(CX, CY);
+
+    if (ribbon > 0.02) {
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = Math.max(1.2, SCALE * 0.004 * ribbon);
+      ctx.globalAlpha = ribbon;
+      for (let k = 0; k < 4; k++) {
+        ctx.beginPath();
+        for (let i = 0; i <= 140; i++) {
+          const u = i / 140;
+          const a = u * Math.PI * 2 + k * Math.PI/2;
+          const rr = lerp(SCALE*0.18, SCALE*0.02, collapse) * (1 - 0.4*u);
+          const x = Math.cos(a*1.3) * rr;
+          const y = Math.sin(a) * rr * 0.7;
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    const ballR = lerp(SCALE*0.06, SCALE*0.004, easeInCubic(collapse));
+    const glowR = ballR * (1.8 + pulse*3.5);
+    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, glowR);
+    g.addColorStop(0, `rgba(255,255,255,${0.95})`);
+    g.addColorStop(0.25, `rgba(255,255,255,${0.7 + pulse*0.2})`);
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(0, 0, glowR, 0, TAU);
+    ctx.fill();
+
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(0, 0, ballR, 0, TAU);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawLogo(t) {
+    const p = clamp((t - 14) / 1, 0, 1);
+    const hold = smoothstep(0, 0.18, p);
+    const reveal = smoothstep(0.18, 0.55, p);
+    const amberPulse = Math.exp(-Math.pow((p - 0.5) / 0.14, 2));
+
+    const pointR = lerp(SCALE*0.004, SCALE*0.002, hold);
+    drawCircle(CX, CY, pointR, 1);
+
+    ctx.save();
+    ctx.translate(CX, CY);
+
+    if (amberPulse > 0.001) {
+      const r = SCALE * (0.02 + amberPulse * 0.23);
+      const g = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
+      g.addColorStop(0, `rgba(255,190,90,${0.22*amberPulse})`);
+      g.addColorStop(0.35, `rgba(255,176,64,${0.14*amberPulse})`);
+      g.addColorStop(1, 'rgba(255,160,40,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, TAU);
+      ctx.fill();
+    }
+
+    ctx.globalAlpha = reveal;
+    ctx.fillStyle = '#fff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = `600 ${Math.floor(SCALE*0.05)}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif`;
+    ctx.letterSpacing = '0.08em';
+    ctx.fillText('AUREL', 0, 0);
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+
+  function render(globalTime) {
+    const t = globalTime % DURATION;
+    ctx.clearRect(0, 0, W, H);
+
+    if (t < 1) {
+      drawOrigin(t);
+    } else if (t < 2) {
+      drawLine(t);
+    } else if (t < 4) {
+      drawGridToCircle(t);
+    } else if (t < 6) {
+      drawSphere(t);
+    } else if (t < 8) {
+      drawInterface(t);
+    } else if (t < 10) {
+      drawCubeBloom(t);
+    } else if (t < 12) {
+      drawVortex(t);
+    } else if (t < 13) {
+      drawWatch(t);
+    } else if (t < 14) {
+      drawCollapse(t);
+    } else {
+      drawLogo(t);
+    }
+  }
+
+  let start = performance.now();
+  function loop(now) {
+    const elapsed = (now - start) / 1000;
+    render(elapsed);
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

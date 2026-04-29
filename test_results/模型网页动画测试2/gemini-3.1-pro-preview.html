@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<style>
+  body, html {
+    margin: 0; padding: 0; width: 100%; height: 100%;
+    background-color: #000; overflow: hidden; font-family: sans-serif;
+  }
+  canvas {
+    display: block; width: 100%; height: 100%;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+  const canvas = document.getElementById("c");
+  const ctx = canvas.getContext("2d");
+  
+  let scale = 1.0;
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    scale = Math.min(canvas.width, canvas.height) / 1000;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function easeInOutCubic(t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
+  function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
+  function easeOutBack(t) { const c1 = 1.70158; const c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); }
+  function easeOutExp(t) { return t === 1 ? 1 : 1 - Math.pow(2, -10 * t); }
+  function easeInExp(t) { return t === 0 ? 0 : Math.pow(2, 10 * t - 10); }
+
+  function drawRoundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.arcTo(x + w, y, x + w, y + r, r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+    ctx.lineTo(x + r, y + h);
+    ctx.arcTo(x, y + h, x, y + h - r, r);
+    ctx.lineTo(x, y + r);
+    ctx.arcTo(x, y, x + r, y, r);
+    ctx.closePath();
+  }
+
+  function project3D(x, y, z, rotX, rotY) {
+    let x1 = x * Math.cos(rotY) - z * Math.sin(rotY);
+    let z1 = x * Math.sin(rotY) + z * Math.cos(rotY);
+    let y2 = y * Math.cos(rotX) - z1 * Math.sin(rotX);
+    let z2 = y * Math.sin(rotX) + z1 * Math.cos(rotX);
+    return {x: x1, y: y2, z: z2};
+  }
+
+  let startTime = null;
+  let particles = [];
+  let particlesInitialized = false;
+  let watchTargetsInitialized = false;
+  
+  const S_CUBE = 130;
+  const faces = [
+    { c:[0,0,S_CUBE], u:[1,0,0], v:[0,1,0] },
+    { c:[0,0,-S_CUBE], u:[-1,0,0], v:[0,1,0] },
+    { c:[S_CUBE,0,0], u:[0,0,-1], v:[0,1,0] },
+    { c:[-S_CUBE,0,0], u:[0,0,1], v:[0,1,0] },
+    { c:[0,S_CUBE,0], u:[1,0,0], v:[0,0,-1] },
+    { c:[0,-S_CUBE,0], u:[1,0,0], v:[0,0,1] }
+  ];
+
+  function initParticles(rx, ry) {
+    particles = [];
+    for(let f=0; f<6; f++) {
+      let face = faces[f];
+      let cx = face.c[0] * 2.5; 
+      let cy = face.c[1] * 2.5;
+      let cz = face.c[2] * 2.5;
+      for(let i=0; i<100; i++) {
+        let theta = i * Math.PI*2 / 100;
+        let r = S_CUBE * (1.0 + 0.5 * Math.cos(theta*2));
+        let lx = face.u[0]*(r*Math.cos(theta)) + face.v[0]*(r*Math.sin(theta));
+        let ly = face.u[1]*(r*Math.cos(theta)) + face.v[1]*(r*Math.sin(theta));
+        let lz = face.u[2]*(r*Math.cos(theta)) + face.v[2]*(r*Math.sin(theta));
+        let p = project3D(cx + lx, cy + ly, cz + lz, rx, ry);
+        
+        let angle = Math.random() * Math.PI * 2;
+        let vr = 80 + Math.random() * 250; 
+        particles.push({ 
+          sx: p.x, sy: p.y,
+          va: angle, vr: vr, vry: vr * (0.3 + 0.3*Math.random()),
+          vdir: Math.random() > 0.5 ? 1 : -1, vspeed: 1 + Math.random()*2
+        });
+      }
+    }
+  }
+
+  function initWatchTargets() {
+    let targets = [];
+    let W = 110, H = 150, rad = 25;
+    function addSeg(x1,y1, x2,y2, steps) {
+        for(let i=0; i<steps; i++) targets.push({ x: lerp(x1,x2,i/steps), y: lerp(y1,y2,i/steps) });
+    }
+    function addArc(cx,cy, c_ang, d_ang, r, steps) {
+        for(let i=0; i<steps; i++){
+            let a = c_ang + d_ang * (i/(steps>1?steps-1:1));
+            targets.push({ x: cx + r*Math.cos(a), y: cy + r*Math.sin(a) });
+        }
+    }
+    addSeg(-20,-95, 20,-95, 25);
+    addSeg(20,-95, 20,-75, 10);
+    addSeg(20,-75, W/2-rad, -H/2, 25);
+    addArc(W/2-rad, -H/2+rad, -Math.PI/2, Math.PI/2, rad, 30);
+    addSeg(W/2, -H/2+rad, W/2, H/2-rad, 80);
+    addArc(W/2-rad, H/2-rad, 0, Math.PI/2, rad, 30);
+    addSeg(W/2-rad, H/2, 20, H/2, 25);
+    addSeg(20,75, 20,95, 10);
+    addSeg(20,95, -20,95, 25);
+    addSeg(-20,95, -20,75, 10);
+    addSeg(-20,75, -W/2+rad, H/2, 25);
+    addArc(-W/2+rad, H/2-rad, Math.PI/2, Math.PI/2, rad, 30);
+    addSeg(-W/2, H/2-rad, -W/2, -H/2+rad, 80);
+    addArc(-W/2+rad, -H/2+rad, Math.PI, Math.PI/2, rad, 30);
+    addSeg(-W/2+rad, -H/2, -20, -H/2, 25);
+    addSeg(-20,-75, -20,-95, 10);
+    
+    let resampled = [];
+    for(let i=0; i<600; i++) {
+        let frac = (i / 600) * targets.length;
+        let idxf = Math.floor(frac);
+        let id2 = (idxf + 1) % targets.length;
+        let rem = frac - idxf;
+        resampled.push({ x: lerp(targets[idxf].x, targets[id2].x, rem), y: lerp(targets[idxf].y, targets[id2].y, rem) });
+    }
+    
+    for(let i=0; i<600; i++) {
+        particles[i].wx = resampled[i].x;
+        particles[i].wy = resampled[i].y;
+        let ang = Math.random()*Math.PI*2;
+        let dr = 40 * Math.random();
+        particles[i].cx = dr * Math.cos(ang);
+        particles[i].cy = dr * Math.sin(ang);
+    }
+  }
+
+  function loop(now) {
+    if (!startTime) startTime = now;
+    let t = (now - startTime) / 1000;
+    if (t > 15) t = 15.0;
+
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.save();
+    ctx.translate(canvas.width / 2, canvas.height / 2);
+    ctx.scale(scale, scale);
+
+    // 0 - 1: ORIGIN
+    if (t < 1.0) {
+      let p = t;
+      ctx.fillStyle = "white";
+      ctx.beginPath(); ctx.arc(0, 0, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.lineWidth = 1.5;
+      for (let i = 0; i < 3; i++) {
+        let delay = i * 0.15;
+        if (p > delay) {
+          let tp = Math.min((p - delay) / 0.55, 1.0);
+          let r = lerp(3, 250, easeOutCubic(tp));
+          let alpha = 1.0 - Math.pow(tp, 1.5);
+          if (alpha > 0) {
+            ctx.strokeStyle = `rgba(255,255,255,${alpha})`;
+            ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.stroke();
+          }
+        }
+      }
+    }
+
+    // 1 - 2: LINE
+    else if (t < 2.0) {
+      let p = t - 1.0;
+      let w = lerp(6, canvas.width / scale * 1.5, easeOutExp(p));
+      ctx.fillStyle = "white";
+      ctx.fillRect(-w/2, -1, w, 2);
+    }
+
+    // 2 - 4: GRID -> CIRCLE
+    else if (t < 4.0) {
+      let p_grid = Math.min((t - 2.0) / 0.5, 1.0);
+      let p_distort = Math.max(Math.min((t - 2.5) / 1.5, 1.0), 0.0);
+      let R = 320;
+      
+      ctx.save();
+      ctx.rotate(easeInOutCubic(p_distort) * Math.PI / 2);
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = "white";
+      let fadeOutInner = p_distort > 0.6 ? 1.0 - (p_distort - 0.6) / 0.4 : 1.0;
+
+      for (let c = 0; c < 2; c++) {
+        for (let i = 0; i < 9; i++) {
+          let isCenter = (i === 4);
+          let isOuter = (i === 0 || i === 8);
+          ctx.globalAlpha = isOuter ? 1.0 : fadeOutInner;
+          
+          let currentHalfL = R;
+          if (p_grid < 1.0) {
+              if (c === 0 && isCenter) currentHalfL = lerp((canvas.width/scale)*0.75, R, easeOutCubic(p_grid));
+              else { currentHalfL = lerp(0, R, easeOutCubic(p_grid)); ctx.globalAlpha *= p_grid; }
+          }
+          
+          let offset = -R + i * (2*R / 8);
+          ctx.beginPath();
+          let segments = 60;
+          for (let s = 0; s <= segments; s++) {
+            let localX = -currentHalfL + s * (2*currentHalfL / segments);
+            let x = c === 0 ? localX : offset;
+            let y = c === 0 ? offset : localX;
+            let tu = (x/R) * Math.sqrt(1 - Math.pow(y/R,2)/2);
+            let tv = (y/R) * Math.sqrt(1 - Math.pow(x/R,2)/2);
+            let cx = lerp(x, tu * R, easeInOutCubic(p_distort));
+            let cy = lerp(y, tv * R, easeInOutCubic(p_distort));
+            if (s === 0) ctx.moveTo(cx, cy); else ctx.lineTo(cx, cy);
+          }
+          ctx.stroke();
+        }
+      }
+      ctx.restore();
+    }
+
+    // 4 - 6: WIREFRAME -> SOLID SPHERE
+    else if (t < 6.0) {
+      let p_wire = Math.min((t - 4.0) / 1.0, 1.0);
+      let p_solid = Math.max(Math.min((t - 5.0) / 1.0, 1.0), 0.0);
+      let R = 320;
+
+      ctx.lineWidth = 1.5;
+      let rot = (t - 4.0) * 1.0;
+      let tilt = 0.35;
+
+      let gradAlpha = easeOutCubic(p_solid);
+      if (gradAlpha > 0) {
+          ctx.beginPath(); ctx.arc(0, 0, R, 0, Math.PI*2);
+          let grad = ctx.createRadialGradient(-R*0.35, -R*0.35, 0, -R*0.1, -R*0.1, R*1.2);
+          grad.addColorStop(0, `rgba(255, 255, 255, ${gradAlpha})`);
+          grad.addColorStop(1, `rgba(40, 40, 40, ${gradAlpha})`);
+          ctx.fillStyle = grad;
+          ctx.fill();
+      }
+
+      let wireAlpha = p_wire * (1.0 - gradAlpha);
+      if (wireAlpha > 0) {
+          ctx.strokeStyle = `rgba(255,255,255, ${wireAlpha})`;
+          for(let i=0; i<12; i++) {
+              let lon = i * Math.PI*2 / 12 + rot;
+              ctx.beginPath();
+              for(let s=0; s<=60; s++) {
+                  let lat = -Math.PI/2 + s * Math.PI / 60;
+                  let x0 = Math.cos(lat) * Math.sin(lon); let y0 = Math.sin(lat); let z0 = Math.cos(lat) * Math.cos(lon);
+                  let x = x0; let y = y0 * Math.cos(tilt) - z0 * Math.sin(tilt);
+                  if(s===0) ctx.moveTo(x*R, y*R); else ctx.lineTo(x*R, y*R);
+              }
+              ctx.stroke();
+          }
+          for(let i=1; i<9; i++) {
+              let lat = -Math.PI/2 + i * Math.PI / 9;
+              ctx.beginPath();
+              for(let s=0; s<=60; s++) {
+                  let lon = s * Math.PI*2 / 60;
+                  let x0 = Math.cos(lat) * Math.sin(lon); let y0 = Math.sin(lat); let z0 = Math.cos(lat) * Math.cos(lon);
+                  let x = x0; let y = y0 * Math.cos(tilt) - z0 * Math.sin(tilt);
+                  if(s===0) ctx.moveTo(x*R, y*R); else ctx.lineTo(x*R, y*R);
+              }
+              ctx.stroke();
+          }
+      }
+
+      ctx.strokeStyle = "white"; ctx.lineWidth = 2; ctx.globalAlpha = 1.0;
+      ctx.beginPath(); ctx.arc(0,0,R, 0, Math.PI*2); ctx.stroke();
+    }
+
+    // 6 - 8: INTERFACE
+    else if (t < 8.0) {
+      let p_flat = Math.min((t - 6.0) / 0.5, 1.0);
+      let p_ui = Math.max(Math.min((t - 6.5)/1.5, 1.0), 0.0);
+      let R = 320;
+      let W_ph = 200, H_ph = 420, rad_ph = 28;
+
+      let cur_W = lerp(R*2, W_ph, easeInOutCubic(p_flat));
+      let cur_H = lerp(R*2, H_ph, easeInOutCubic(p_flat));
+      let cur_rad = lerp(R, rad_ph, easeInOutCubic(p_flat));
+
+      ctx.fillStyle = "#000";
+      drawRoundRect(-cur_W/2, -cur_H/2, cur_W, cur_H, cur_rad);
+      ctx.fill();
+
+      let gradAlpha = 1.0 - easeOutCubic(p_flat);
+      if (gradAlpha > 0) {
+          ctx.save(); ctx.clip();
+          let grad = ctx.createRadialGradient(-R*0.35, -R*0.35, 0, -R*0.1, -R*0.1, R*1.2);
+          grad.addColorStop(0, `rgba(255, 255, 255, ${gradAlpha})`);
+          grad.addColorStop(1, `rgba(40, 40, 40, ${gradAlpha})`);
+          ctx.fillStyle = grad;
+          ctx.fillRect(-R,-R,R*2,R*2);
+          ctx.restore();
+      }
+
+      ctx.strokeStyle = "white"; ctx.lineWidth = 2;
+      drawRoundRect(-cur_W/2, -cur_H/2, cur_W, cur_H, cur_rad);
+      ctx.stroke();
+
+      if (p_ui > 0) {
+          ctx.globalAlpha = Math.min(p_ui * 2.0, 1.0);
+          let ix0 = -W_ph/2 + 25; let iy0 = -H_ph/2 + 65;
+          let iw = (W_ph - 50 - 3*16) / 4;
+          for(let r=0; r<6; r++) {
+              for(let c=0; c<4; c++) {
+                  drawRoundRect(ix0 + c*(iw+16), iy0 + r*(iw+16), iw, iw, 6);
+                  ctx.stroke();
+              }
+          }
+          ctx.beginPath(); ctx.moveTo(-50, H_ph/2 - 15); ctx.lineTo(50, H_ph/2 - 15);
+          ctx.lineWidth = 4; ctx.stroke();
+          
+          ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.moveTo(W_ph/2 - 45, -H_ph/2 + 25); ctx.lineTo(W_ph/2 - 30, -H_ph/2 + 25); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(W_ph/2 - 22, -H_ph/2 + 25); ctx.lineTo(W_ph/2 - 15, -H_ph/2 + 25); ctx.stroke();
+          ctx.globalAlpha = 1.0;
+      }
+    }
+
+    // 8 - 10: CUBE -> BLOOM
+    else if (t < 10.0) {
+      let p_cube = Math.min((t - 8.0) / 0.5, 1.0);
+      let p_bloom = Math.max(Math.min((t - 8.5)/1.5, 1.0), 0.0);
+
+      let rx = Math.asin(1/Math.sqrt(3)) + Math.PI * (1 - easeOutCubic(p_cube));
+      let ry = Math.PI/4 + Math.PI * (1 - easeOutCubic(p_cube));
+      
+      let c_scale = lerp(0.5, 1.0, easeOutCubic(p_cube));
+      let c_alpha = easeOutCubic(p_cube);
+
+      if (p_cube < 1.0) {
+          let sW = lerp(200, S_CUBE*2, easeInOutCubic(p_cube));
+          let sH = lerp(420, S_CUBE*2, easeInOutCubic(p_cube));
+          ctx.strokeStyle = `rgba(255,255,255,${1.0 - c_alpha})`;
+          ctx.lineWidth = 2;
+          drawRoundRect(-sW/2, -sH/2, sW, sH, 28);
+          ctx.stroke();
+      }
+
+      ctx.strokeStyle = `rgba(255,255,255,${c_alpha})`;
+      ctx.lineWidth = 1.5;
+
+      for(let f=0; f<6; f++) {
+          let face = faces[f];
+          let offsetExt = easeInOutCubic(p_bloom) * S_CUBE * 1.5;
+          let cx = face.c[0] + face.c[0]/S_CUBE * offsetExt;
+          let cy = face.c[1] + face.c[1]/S_CUBE * offsetExt;
+          let cz = face.c[2] + face.c[2]/S_CUBE * offsetExt;
+          
+          ctx.beginPath();
+          for(let i=0; i<100; i++) {
+              let theta = i * Math.PI*2 / 100;
+              let cosA = Math.cos(theta), sinA = Math.sin(theta);
+              let r_sq = S_CUBE / Math.max(Math.abs(cosA), Math.abs(sinA));
+              let r_oval = S_CUBE * (1.0 + 0.5 * Math.cos(theta*2));
+              let r = lerp(r_sq, r_oval, easeInOutCubic(p_bloom));
+              
+              let p3x = cx + face.u[0]*(r*cosA) + face.v[0]*(r*sinA);
+              let p3y = cy + face.u[1]*(r*cosA) + face.v[1]*(r*sinA);
+              let p3z = cz + face.u[2]*(r*cosA) + face.v[2]*(r*sinA);
+              p3x *= c_scale; p3y *= c_scale; p3z *= c_scale;
+              let proj = project3D(p3x, p3y, p3z, rx, ry);
+              if (i===0) ctx.moveTo(proj.x, proj.y); else ctx.lineTo(proj.x, proj.y);
+          }
+          ctx.closePath(); ctx.stroke();
+      }
+    }
+
+    // 10 - 15: VORTEX, WATCH, COLLAPSE, LOGO
+    else {
+      if (!particlesInitialized) { 
+        initParticles(Math.asin(1/Math.sqrt(3)), Math.PI/4); 
+        particlesInitialized = true; 
+      }
+      if (t >= 12.0 && !watchTargetsInitialized) { 
+        initWatchTargets(); 
+        watchTargetsInitialized = true; 
+      }
+
+      let p_vor = Math.max(Math.min((t - 10.0) / 2.0, 1.0), 0.0);
+      let p_w = Math.max(Math.min((t - 12.0) / 1.0, 1.0), 0.0);
+      let p_ribbon = Math.max(Math.min((t - 13.0) / 0.5, 1.0), 0.0);
+      let p_comp = Math.max(Math.min((t - 13.5) / 0.3, 1.0), 0.0);
+      let p_pulse = Math.max(Math.min((t - 13.8) / 0.1, 1.0), 0.0);
+      let p_col = Math.max(Math.min((t - 13.9) / 0.1, 1.0), 0.0);
+      let p_logo = Math.max(Math.min((t - 14.2) / 0.3, 1.0), 0.0);
+      let p_glow = Math.max(Math.min((t - 14.5) / 0.5, 1.0), 0.0);
+
+      // Amber Glow Background
+      if (p_glow > 0) {
+          let glowStrength = Math.sin(p_glow * Math.PI) * 0.9;
+          let grad = ctx.createRadialGradient(0,0,0, 0,0, 450);
+          grad.addColorStop(0, `rgba(255, 160, 0, ${glowStrength})`);
+          grad.addColorStop(1, `rgba(255, 160, 0, 0)`);
+          ctx.fillStyle = grad;
+          ctx.globalCompositeOperation = "screen";
+          ctx.fillRect(-800,-800,1600,1600);
+          ctx.globalCompositeOperation = "source-over";
+      }
+
+      ctx.fillStyle = "white";
+      let drawParts = (p_comp < 1.0);
+
+      if (drawParts && p_ribbon < 1.0) {
+          ctx.shadowBlur = lerp(0, 12, p_vor) * (1 - p_w) + 6*(p_w); 
+          ctx.shadowColor = "white";
+      }
+
+      if (p_comp < 1.0 && p_logo === 0) {
+          if (p_ribbon > 0) {
+              ctx.strokeStyle = `rgba(255,255,255,${1.0 - p_comp})`;
+              ctx.lineWidth = 1.2;
+              ctx.beginPath();
+          }
+
+          for(let i=0; i<particles.length; i++) {
+              let pt = particles[i];
+              let cx, cy;
+              
+              if (p_w === 0) {
+                  let ang = pt.va + pt.vdir * pt.vspeed * (p_vor * 10);
+                  let tx0 = Math.cos(ang) * pt.vr; let ty0 = Math.sin(ang) * pt.vry;
+                  let tx = tx0 * Math.cos(Math.PI/6) - ty0 * Math.sin(Math.PI/6);
+                  let ty = tx0 * Math.sin(Math.PI/6) + ty0 * Math.cos(Math.PI/6);
+                  cx = lerp(pt.sx, tx, easeOutCubic(p_vor));
+                  cy = lerp(pt.sy, ty, easeOutCubic(p_vor));
+                  pt.vx = cx; pt.vy = cy;
+              } else {
+                  let vx = lerp(pt.vx, pt.wx, easeOutBack(p_w));
+                  let vy = lerp(pt.vy, pt.wy, easeOutBack(p_w));
+                  
+                  if(p_ribbon > 0) {
+                      let swirl = (1.0 - p_ribbon) * 60;
+                      let aa = p_ribbon * 12 + i*0.1;
+                      let rx = pt.cx + swirl * Math.cos(aa);
+                      let ry = pt.cy + swirl * Math.sin(aa);
+                      cx = lerp(vx, rx, easeOutCubic(p_ribbon));
+                      cy = lerp(vy, ry, easeOutCubic(p_ribbon));
+                      
+                      if (i===0) ctx.moveTo(cx,cy); else ctx.lineTo(cx,cy);
+                      ctx.globalAlpha = 1.0 - p_comp;
+                  } else {
+                      cx = vx; cy = vy;
+                  }
+              }
+              if (p_ribbon < 1.0) {
+                  ctx.beginPath(); ctx.arc(cx, cy, 1.2, 0, Math.PI*2); ctx.fill();
+              }
+          }
+          if (p_ribbon > 0) {
+              ctx.stroke(); ctx.globalAlpha = 1.0;
+          }
+          ctx.shadowBlur = 0;
+      }
+
+      if (p_ribbon > 0.6 && p_logo === 0) {
+          let pr = (p_ribbon-0.6)/0.4;
+          let rad = lerp(0, 45, pr);
+          rad = lerp(rad, 25, easeOutCubic(p_comp));
+          rad = lerp(rad, 110, Math.sin(p_pulse * Math.PI));
+          rad = lerp(rad, 0, easeInExp(p_col));
+          
+          if (rad > 0.5) {
+              ctx.shadowBlur = Math.sin(p_pulse * Math.PI) * 60; ctx.shadowColor="white";
+              ctx.beginPath(); ctx.arc(0, 0, rad, 0, Math.PI*2); ctx.fill();
+              ctx.shadowBlur = 0;
+          }
+      }
+
+      if (p_col === 1.0 && p_logo < 1.0) {
+          ctx.fillStyle = `rgba(255,255,255,${1.0 - p_logo})`;
+          ctx.beginPath(); ctx.arc(0, 0, 2 + p_logo*15, 0, Math.PI*2); ctx.fill();
+      }
+
+      if (p_logo > 0) {
+          ctx.globalAlpha = Math.min(p_logo * 1.5, 1.0);
+          ctx.fillStyle = "white";
+          ctx.font = "800 48px sans-serif";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          
+          let txt = "NEXUS";
+          let spacing = lerp(8, 26, easeOutCubic(p_logo));
+          let tw = 36; 
+          let step = tw + spacing;
+          let startX = -((txt.length-1)*step)/2;
+          for(let i=0; i<txt.length; i++) {
+              ctx.fillText(txt[i], startX + i*step, 0);
+          }
+          ctx.globalAlpha = 1.0;
+      }
+    }
+
+    ctx.restore();
+    requestAnimationFrame(loop);
+  }
+
+  requestAnimationFrame(loop);
+
+</script>
+</body>
+</html>

@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D 汽车变速箱工作原理演示</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #050505;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #fff;
+            user-select: none;
+        }
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+        #ui-panel {
+            position: absolute;
+            right: 20px;
+            top: 20px;
+            width: 320px;
+            background: rgba(10, 20, 30, 0.6);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.1), inset 0 0 10px rgba(0, 255, 255, 0.05);
+            z-index: 10;
+        }
+        h2 {
+            margin-top: 0;
+            font-size: 1.2rem;
+            text-transform: uppercase;
+            color: #00ffff;
+            border-bottom: 1px solid rgba(0, 255, 255, 0.3);
+            padding-bottom: 10px;
+            letter-spacing: 2px;
+            text-shadow: 0 0 5px #00ffff;
+        }
+        .control-group {
+            margin-bottom: 20px;
+        }
+        .control-label {
+            font-size: 0.9rem;
+            color: #88ccff;
+            margin-bottom: 8px;
+            display: block;
+        }
+        input[type=range] {
+            width: 100%;
+            accent-color: #00ffff;
+            background: rgba(255,255,255,0.1);
+            height: 4px;
+            border-radius: 2px;
+            outline: none;
+        }
+        .gear-buttons {
+            display: flex;
+            justify-content: space-between;
+        }
+        .btn {
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid #00ffff;
+            color: #00ffff;
+            width: 45px;
+            height: 45px;
+            border-radius: 8px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            box-shadow: 0 0 5px rgba(0, 255, 255, 0.2);
+        }
+        .btn:hover {
+            background: rgba(0, 255, 255, 0.2);
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.5);
+        }
+        .btn.active {
+            background: #00ffff;
+            color: #000;
+            box-shadow: 0 0 20px #00ffff;
+            transform: scale(1.05);
+        }
+        .btn-r { border-color: #ff3366; color: #ff3366; }
+        .btn-r:hover { background: rgba(255, 51, 102, 0.2); box-shadow: 0 0 15px rgba(255, 51, 102, 0.5); }
+        .btn-r.active { background: #ff3366; color: #fff; box-shadow: 0 0 20px #ff3366; }
+        
+        .hud {
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 8px;
+            padding: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .hud-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.9rem;
+        }
+        .hud-item:last-child { margin-bottom: 0; }
+        .hud-label { color: #aaaaaa; }
+        .hud-value { color: #00ffaa; font-weight: bold; text-shadow: 0 0 3px #00ffaa; }
+        .hud-value.warning { color: #ffaa00; text-shadow: 0 0 3px #ffaa00; }
+    </style>
+    <!-- 引入 Three.js 和 OrbitControls -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+
+    <div id="canvas-container"></div>
+
+    <div id="ui-panel">
+        <h2>系统控制面板</h2>
+        
+        <div class="control-group">
+            <span class="control-label">发动机转速 (INPUT RPM)</span>
+            <input type="range" id="rpm-slider" min="10" max="300" value="100">
+        </div>
+
+        <div class="control-group">
+            <span class="control-label">挡位选择器 (GEAR SELECT)</span>
+            <div class="gear-buttons">
+                <button class="btn btn-r" data-gear="R">R</button>
+                <button class="btn active" data-gear="N">N</button>
+                <button class="btn" data-gear="1">1</button>
+                <button class="btn" data-gear="2">2</button>
+                <button class="btn" data-gear="3">3</button>
+            </div>
+        </div>
+
+        <div class="hud">
+            <div class="hud-item">
+                <span class="hud-label">离合器状态</span>
+                <span class="hud-value" id="hud-clutch">接合中</span>
+            </div>
+            <div class="hud-item">
+                <span class="hud-label">目标传动比</span>
+                <span class="hud-value" id="hud-ratio">-</span>
+            </div>
+            <div class="hud-item">
+                <span class="hud-label">输入转速(vIN)</span>
+                <span class="hud-value" id="hud-vin">100 RPM</span>
+            </div>
+            <div class="hud-item">
+                <span class="hud-label">输出转速(vOUT)</span>
+                <span class="hud-value" id="hud-vout">0 RPM</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x050505, 0.015);
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(-18, 12, 25);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        container.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.target.set(4, -2, 0);
+
+        // 场景光照
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
+        scene.add(ambientLight);
+        
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(10, 20, 10);
+        scene.add(dirLight);
+
+        const spotLight = new THREE.SpotLight(0x00ffff, 1.5, 50, 0.5, 0.5, 1);
+        spotLight.position.set(-10, 15, 0);
+        spotLight.target.position.set(4, 0, 0);
+        scene.add(spotLight);
+        scene.add(spotLight.target);
+
+        // 辅助网格
+        const gridHelper = new THREE.GridHelper(60, 60, 0x004466, 0x001122);
+        gridHelper.position.y = -8;
+        scene.add(gridHelper);
+
+        // 材质预设
+        const materials = {
+            input: new THREE.MeshStandardMaterial({ color: 0xff3333, roughness: 0.3, metalness: 0.8, transparent: true, opacity: 0.9 }),
+            counter: new THREE.MeshStandardMaterial({ color: 0xaaaaaa, roughness: 0.4, metalness: 0.9, transparent: true, opacity: 0.7 }),
+            output: new THREE.MeshStandardMaterial({ color: 0x00ffff, roughness: 0.2, metalness: 0.9, transparent: true, opacity: 0.8 }),
+            freeGear: new THREE.MeshStandardMaterial({ color: 0x0066ff, roughness: 0.3, metalness: 0.8, transparent: true, opacity: 0.8 }),
+            synchro: new THREE.MeshStandardMaterial({ color: 0xff00ff, roughness: 0.2, metalness: 1.0, transparent: true, opacity: 0.9, emissive: 0x440044 }),
+            clutch: new THREE.MeshStandardMaterial({ color: 0xffaa00, roughness: 0.6, metalness: 0.4, transparent: true, opacity: 0.9 })
+        };
+
+        const edgeMaterial = new THREE.LineBasicMaterial({ color: 0x00ffff, opacity: 0.5, transparent: true });
+
+        // 构建带科技线框的齿轮
+        function createGear(radius, width, mat, isShaft = false) {
+            const group = new THREE.Group();
+            const segments = isShaft ? 32 : 16;
+            const geom = new THREE.CylinderGeometry(radius, radius, width, segments);
+            const mesh = new THREE.Mesh(geom, mat);
+            mesh.rotation.z = Math.PI / 2;
+            group.add(mesh);
+
+            if (!isShaft) {
+                const edges = new THREE.EdgesGeometry(geom);
+                const line = new THREE.LineSegments(edges, edgeMaterial);
+                line.rotation.z = Math.PI / 2;
+                group.add(line);
+                
+                // 内部空洞(表示套在轴上)
+                const holeGeom = new THREE.CylinderGeometry(0.51, 0.51, width + 0.02, 16);
+                const holeMat = new THREE.MeshBasicMaterial({ color: 0x050505 });
+                const hole = new THREE.Mesh(holeGeom, holeMat);
+                hole.rotation.z = Math.PI / 2;
+                group.add(hole);
+            }
+            return group;
+        }
+
+        // ================= 变速箱结构搭建 =================
+        // 布局参数：X轴为轴线方向。
+        const CENTER_DIST = 4; // 主副轴心距
+        
+        // 1. 输入组 (红)
+        const inputGroup = new THREE.Group();
+        scene.add(inputGroup);
+        const inputShaft = createGear(0.5, 6, materials.input, true);
+        inputShaft.position.set(-7, 0, 0);
+        inputGroup.add(inputShaft);
+        const inputDriveGear = createGear(2, 1, materials.input); // 固定齿轮
+        inputDriveGear.position.set(-4, 0, 0);
+        inputGroup.add(inputDriveGear);
+
+        // 离合器盘 (独立组，可沿X向滑动)
+        const clutchGroup = new THREE.Group();
+        scene.add(clutchGroup);
+        const clutchPlate = createGear(2.4, 0.4, materials.clutch);
+        clutchPlate.position.set(-5, 0, 0);
+        clutchGroup.add(clutchPlate);
+
+        // 2. 副轴组 (灰，常啮合)
+        const counterGroup = new THREE.Group();
+        counterGroup.position.set(0, -CENTER_DIST, 0);
+        scene.add(counterGroup);
+        const counterShaft = createGear(0.6, 22, materials.counter, true);
+        counterShaft.position.set(4, 0, 0);
+        counterGroup.add(counterShaft);
+        
+        // 副轴固定齿轮
+        const c_drive = createGear(2, 1, materials.counter); c_drive.position.x = -4; counterGroup.add(c_drive); // 传动比 1:1 接输入
+        const c_g1 = createGear(1, 1, materials.counter); c_g1.position.x = 0; counterGroup.add(c_g1);
+        const c_g2 = createGear(2, 1, materials.counter); c_g2.position.x = 4; counterGroup.add(c_g2);
+        const c_g3 = createGear(3, 1, materials.counter); c_g3.position.x = 8; counterGroup.add(c_g3);
+        const c_gr = createGear(1, 1, materials.counter); c_gr.position.x = 12; counterGroup.add(c_gr);
+
+        // 3. 输出轴组 (青) - 只包含轴心
+        const outputShaftCore = new THREE.Group();
+        const mainOutputShaft = createGear(0.5, 20, materials.output, true);
+        mainOutputShaft.position.set(6, 0, 0);
+        outputShaftCore.add(mainOutputShaft);
+        scene.add(outputShaftCore);
+
+        // 4. 输出轴上的空套齿轮 (常啮合，独立旋转)
+        const freeGears = {};
+        function addFreeGear(id, x, r) {
+            const gear = createGear(r, 1, materials.freeGear);
+            gear.position.set(x, 0, 0);
+            scene.add(gear);
+            freeGears[id] = { mesh: gear, radius: r, x: x };
+        }
+        addFreeGear('g1', 0, 3); // 1挡, 比率 3/1 = 3.0
+        addFreeGear('g2', 4, 2); // 2挡, 比率 2/2 = 1.0
+        addFreeGear('g3', 8, 1); // 3挡, 比率 1/3 = 0.33
+        addFreeGear('gr', 12, 1.8); // 倒挡, 预留尺寸空间
+
+        // 倒挡惰轮 (独立)
+        const idlerGroup = new THREE.Group();
+        scene.add(idlerGroup);
+        const idlerGear = createGear(1.5, 1, materials.counter);
+        idlerGear.position.set(12, -2, 1.8); // 空间偏置模拟
+        idlerGroup.add(idlerGear);
+
+        // 5. 同步器套筒 (滑套) - 连接输出轴
+        const sleeves = {};
+        function addSleeve(id, startX) {
+            const group = new THREE.Group();
+            const sleeveMesh = createGear(1.3, 1.5, materials.synchro);
+            group.add(sleeveMesh);
+            group.position.set(startX, 0, 0);
+            scene.add(group);
+            sleeves[id] = { mesh: group, basePos: startX, targetPos: startX };
+        }
+        addSleeve('s12', 2);  // x=2 (N), 移至0 (1挡), 移至4 (2挡)
+        addSleeve('s3r', 10); // x=10 (N), 移至8 (3挡), 移至12 (R挡)
+
+
+        // ================= 核心物理与动画逻辑 =================
+        let currentGearState = 'N';
+        let baseRpm = 100;
+        let isClutchEngaged = true;
+        let clutchOpacityTarget = 1.0;
+        
+        // 目标齿轮位置字典 (对于相应套筒)
+        const shiftMap = {
+            'N':  { s12: 2, s3r: 10 },
+            '1':  { s12: 0, s3r: 10, ratio: 3.0 },
+            '2':  { s12: 4, s3r: 10, ratio: 1.0 },
+            '3':  { s12: 2, s3r: 8, ratio: 0.33 },
+            'R':  { s12: 2, s3r: 12, ratio: -1.8 } // 反向
+        };
+
+        // UI 交互
+        document.getElementById('rpm-slider').addEventListener('input', (e) => {
+            baseRpm = parseFloat(e.target.value);
+        });
+
+        let shiftSequence = null;
+
+        document.querySelectorAll('.btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const targetGear = e.target.getAttribute('data-gear');
+                if (targetGear === currentGearState || shiftSequence) return;
+                
+                // 更新UI状态
+                document.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                
+                // 启动换挡序列
+                shiftSequence = { step: 0, target: targetGear };
+                document.getElementById('hud-ratio').innerText = "切换中...";
+            });
+        });
+
+        // 每帧更新 UI HUD
+        function updateHUD(vIn, vOut) {
+            document.getElementById('hud-vin').innerText = Math.abs(vIn * 10).toFixed(0) + ' RPM';
+            document.getElementById('hud-vout').innerText = Math.abs(vOut * 10).toFixed(0) + ' RPM';
+            
+            const clutchStatus = document.getElementById('hud-clutch');
+            if (isClutchEngaged && !shiftSequence) {
+                clutchStatus.innerText = '完全接合';
+                clutchStatus.className = 'hud-value';
+            } else {
+                clutchStatus.innerText = shiftSequence ? '断开切换中' : '滑动/磨合';
+                clutchStatus.className = 'hud-value warning';
+            }
+
+            if (!shiftSequence) {
+                const ratioDisplay = currentGearState === 'N' ? '∞ (空挡)' : 
+                                    Math.abs(shiftMap[currentGearState].ratio).toFixed(2) + (currentGearState === 'R' ? ' (倒转)' : ':1');
+                document.getElementById('hud-ratio').innerText = ratioDisplay;
+            }
+        }
+
+        // Lerp 辅助
+        function lerp(start, end, amt) {
+            return (1 - amt) * start + amt * end;
+        }
+
+        const clock = new THREE.Clock();
+        let prevOutputVelocity = 0; // 动量模拟
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const dt = clock.getDelta();
+            
+            // 1. 处理换挡线性动画序列
+            if (shiftSequence) {
+                isClutchEngaged = false;
+                materials.clutch.opacity = lerp(materials.clutch.opacity, 0.2, 0.15); // 透明度降低
+                clutchPlate.position.x = lerp(clutchPlate.position.x, -5.8, 0.15);    // 轴向分离
+
+                const isDisengaged = Math.abs(clutchPlate.position.x - (-5.8)) < 0.1;
+                
+                if (shiftSequence.step === 0 && isDisengaged) {
+                    // 第1步：退回空挡
+                    sleeves.s12.targetPos = 2;
+                    sleeves.s3r.targetPos = 10;
+                    shiftSequence.step = 1;
+                }
+
+                if (shiftSequence.step === 1) {
+                    // 等待套筒归位
+                    let s12Ready = Math.abs(sleeves.s12.mesh.position.x - 2) < 0.05;
+                    let s3rReady = Math.abs(sleeves.s3r.mesh.position.x - 10) < 0.05;
+                    if (s12Ready && s3rReady) shiftSequence.step = 2;
+                }
+
+                if (shiftSequence.step === 2) {
+                    // 第2步：套筒移向目标挡位
+                    const t = shiftMap[shiftSequence.target];
+                    sleeves.s12.targetPos = t.s12;
+                    sleeves.s3r.targetPos = t.s3r;
+                    
+                    let reached = Math.abs(sleeves.s12.mesh.position.x - t.s12) < 0.05 && 
+                                  Math.abs(sleeves.s3r.mesh.position.x - t.s3r) < 0.05;
+                    if (reached) shiftSequence.step = 3;
+                }
+
+                if (shiftSequence.step === 3) {
+                    // 第3步：离合器接合
+                    clutchPlate.position.x = lerp(clutchPlate.position.x, -5.0, 0.1);
+                    materials.clutch.opacity = lerp(materials.clutch.opacity, 0.9, 0.1);
+                    if (Math.abs(clutchPlate.position.x - (-5.0)) < 0.05) {
+                        currentGearState = shiftSequence.target;
+                        isClutchEngaged = true;
+                        shiftSequence = null; // 序列结束
+                    }
+                }
+            }
+
+            // 平滑移动套筒
+            sleeves.s12.mesh.position.x = lerp(sleeves.s12.mesh.position.x, sleeves.s12.targetPos, 0.2);
+            sleeves.s3r.mesh.position.x = lerp(sleeves.s3r.mesh.position.x, sleeves.s3r.targetPos, 0.2);
+
+            // 2. 运动学计算 (基于角速度)
+            const v_input = baseRpm * 0.1; // 基础角速度倍率
+            
+            // 离合器摩擦力系数 (平滑接合)
+            let clutchFactor = isClutchEngaged ? 1.0 : (1.0 - materials.clutch.opacity) * 0.1; 
+            if (shiftSequence) clutchFactor = 0; // 彻底分离
+
+            // 副轴转速 (输入齿轮r=2, 副轴齿轮r=2, 反向)
+            const v_counter = -v_input * clutchFactor;
+
+            // 各空套齿轮转速独立运转
+            // w_drive * r_drive = w_driven * r_driven
+            const v_g1 = -v_counter * (1 / 3); // counter(r=1) -> g1(r=3)
+            const v_g2 = -v_counter * (2 / 2); // counter(r=2) -> g2(r=2)
+            const v_g3 = -v_counter * (3 / 1); // counter(r=3) -> g3(r=1)
+            
+            // 倒挡：副轴旋转 -> 惰轮反转 -> 输出轴再次反转 (最终与输入法向一致? 不，加了惰轮方向改变)
+            // v_counter(-). 惰轮接合: w_idler = -v_counter * r_counter / r_idler
+            const v_idler = -v_counter * (1 / 1.5);
+            const v_gr = -v_idler * (1.5 / 1.8); // 最终反转
+
+            // 目标输出轴速度
+            let targetOutputVelocity = 0;
+            if (currentGearState === '1') targetOutputVelocity = v_g1;
+            else if (currentGearState === '2') targetOutputVelocity = v_g2;
+            else if (currentGearState === '3') targetOutputVelocity = v_g3;
+            else if (currentGearState === 'R') targetOutputVelocity = v_gr;
+            
+            // 空挡滑动/惯性衰减
+            if (currentGearState === 'N' || shiftSequence) {
+                prevOutputVelocity = lerp(prevOutputVelocity, 0, 0.01);
+            } else {
+                // 咬合时受离合器平滑过渡影响
+                prevOutputVelocity = lerp(prevOutputVelocity, targetOutputVelocity, clutchFactor === 1 ? 1 : 0.05);
+            }
+
+            // 3. 应用旋转变化
+            const rotX_in = v_input * dt;
+            inputGroup.rotation.x += rotX_in;
+            clutchGroup.rotation.x = inputGroup.rotation.x; // 离合器始终随发动机转
+            
+            counterGroup.rotation.x += v_counter * dt;
+            
+            freeGears.g1.mesh.rotation.x += v_g1 * dt;
+            freeGears.g2.mesh.rotation.x += v_g2 * dt;
+            freeGears.g3.mesh.rotation.x += v_g3 * dt;
+            freeGears.gr.mesh.rotation.x += v_gr * dt;
+            idlerGroup.rotation.x += v_idler * dt;
+
+            // 输出轴与同步器绑定
+            const outputRotDelta = prevOutputVelocity * dt;
+            outputShaftCore.rotation.x += outputRotDelta;
+            sleeves.s12.mesh.rotation.x = outputShaftCore.rotation.x;
+            sleeves.s3r.mesh.rotation.x = outputShaftCore.rotation.x;
+
+            updateHUD(v_input, prevOutputVelocity);
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        // 响应自适应
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // 启动循环
+        animate();
+    </script>
+</body>
+</html>

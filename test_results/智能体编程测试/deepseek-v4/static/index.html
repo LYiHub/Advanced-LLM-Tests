@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Multi-Role Calculator</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0f172a;
+  --surface: #1e293b;
+  --surface2: #334155;
+  --border: #475569;
+  --text: #e2e8f0;
+  --text2: #94a3b8;
+  --accent: #3b82f6;
+  --accent-hover: #2563eb;
+  --danger: #ef4444;
+  --danger-hover: #dc2626;
+  --success: #22c55e;
+  --warn: #f59e0b;
+  --guest: #64748b;
+  --member: #3b82f6;
+  --admin: #8b5cf6;
+  --superadmin: #ef4444;
+  --radius: 8px;
+  --radius-lg: 12px;
+  font-family: 'Segoe UI', -apple-system, sans-serif;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 2rem 1rem;
+}
+
+.hidden { display: none !important; }
+
+/* ── Auth Container ── */
+#auth-container {
+  width: 100%; max-width: 420px;
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  padding: 2rem;
+  margin-top: 10vh;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+}
+
+#auth-container h1 {
+  text-align: center; margin-bottom: 1.5rem;
+  font-size: 1.5rem; font-weight: 700;
+}
+
+.tabs { display: flex; gap: 0; margin-bottom: 1.5rem; border-bottom: 2px solid var(--surface2); }
+.tab-btn {
+  flex: 1; padding: 0.75rem;
+  background: none; border: none; color: var(--text2);
+  font-size: 0.95rem; cursor: pointer;
+  border-bottom: 2px solid transparent; margin-bottom: -2px;
+  transition: color 0.2s, border-color 0.2s;
+}
+.tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+.form-group { margin-bottom: 1rem; }
+.form-group label { display: block; margin-bottom: 0.35rem; font-size: 0.9rem; color: var(--text2); }
+.form-group input {
+  width: 100%; padding: 0.65rem 0.75rem;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--radius); color: var(--text);
+  font-size: 0.95rem; outline: none;
+  transition: border-color 0.2s;
+}
+.form-group input:focus { border-color: var(--accent); }
+
+.btn {
+  padding: 0.65rem 1.25rem; border: none; border-radius: var(--radius);
+  font-size: 0.95rem; cursor: pointer; font-weight: 600;
+  transition: background 0.2s, opacity 0.2s;
+}
+.btn-primary { background: var(--accent); color: #fff; width: 100%; margin-top: 0.5rem; }
+.btn-primary:hover { background: var(--accent-hover); }
+.btn-danger { background: var(--danger); color: #fff; }
+.btn-danger:hover { background: var(--danger-hover); }
+.btn-sm { padding: 0.35rem 0.75rem; font-size: 0.8rem; }
+.btn-warn { background: var(--warn); color: #000; }
+.btn-warn:hover { opacity: 0.85; }
+.btn-success { background: var(--success); color: #000; }
+.btn-success:hover { opacity: 0.85; }
+
+.error-msg {
+  color: var(--danger); font-size: 0.85rem;
+  margin-top: 0.5rem; min-height: 1.2em;
+}
+
+/* ── App Container ── */
+#app-container {
+  width: 100%; max-width: 800px;
+}
+
+.app-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 1rem 1.5rem;
+  background: var(--surface); border-radius: var(--radius-lg);
+  margin-bottom: 1rem;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+}
+
+.app-header .user-info { display: flex; align-items: center; gap: 0.75rem; }
+.app-header .username { font-weight: 700; font-size: 1.05rem; }
+.badge {
+  font-size: 0.7rem; padding: 0.2rem 0.55rem; border-radius: 99px;
+  font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
+}
+.badge-guest { background: var(--guest); color: #fff; }
+.badge-member { background: var(--member); color: #fff; }
+.badge-admin { background: var(--admin); color: #fff; }
+.badge-superadmin { background: var(--superadmin); color: #fff; }
+
+/* ── Calculator ── */
+.calc-panel {
+  background: var(--surface); border-radius: var(--radius-lg);
+  padding: 1.5rem; margin-bottom: 1rem;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+}
+
+.calc-display {
+  background: var(--bg); border: 2px solid var(--border);
+  border-radius: var(--radius); padding: 1rem 1.25rem;
+  margin-bottom: 1rem; min-height: 4rem;
+  display: flex; flex-direction: column; justify-content: center;
+}
+
+.calc-display .expression { font-size: 1.3rem; color: var(--text2); min-height: 1.6em; word-break: break-all; }
+.calc-display .result { font-size: 2.2rem; font-weight: 700; min-height: 1.3em; word-break: break-all; }
+.calc-display .tampered-flag { font-size: 0.7rem; color: var(--warn); margin-top: 0.2rem; }
+
+.num-pad { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; }
+.num-btn {
+  padding: 1rem; font-size: 1.2rem; font-weight: 600;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--radius); color: var(--text); cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+}
+.num-btn:hover { background: var(--border); }
+.num-btn:active { transform: scale(0.96); }
+.num-btn.op { background: var(--accent); color: #fff; border-color: var(--accent); }
+.num-btn.op:hover { background: var(--accent-hover); }
+.num-btn.equals { background: var(--success); color: #000; }
+.num-btn.equals:hover { opacity: 0.85; }
+.num-btn.clear { background: var(--danger); color: #fff; }
+.num-btn.clear:hover { background: var(--danger-hover); }
+.num-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* ── Panels ── */
+.panel {
+  background: var(--surface); border-radius: var(--radius-lg);
+  padding: 1.5rem; margin-bottom: 1rem;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+}
+.panel h2 { font-size: 1.15rem; margin-bottom: 1rem; color: var(--text); }
+
+/* History */
+.history-list { max-height: 300px; overflow-y: auto; }
+.history-item {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 0.5rem 0; border-bottom: 1px solid var(--surface2);
+  font-size: 0.9rem;
+}
+.history-item .expr { color: var(--text2); }
+.history-item .res { font-weight: 700; }
+.history-item .time { font-size: 0.75rem; color: var(--text2); }
+.history-item .tampered { color: var(--warn); font-size: 0.7rem; margin-left: 0.5rem; }
+.empty-state { color: var(--text2); text-align: center; padding: 1.5rem; font-size: 0.9rem; }
+
+/* Admin table */
+.user-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+.user-table th, .user-table td {
+  padding: 0.6rem 0.75rem; text-align: left;
+  border-bottom: 1px solid var(--surface2);
+}
+.user-table th { color: var(--text2); font-weight: 600; font-size: 0.8rem; }
+.user-table .actions { display: flex; gap: 0.35rem; flex-wrap: wrap; }
+
+/* Rules */
+.rules-list { margin-bottom: 1rem; }
+.rule-item {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 0.6rem 0.75rem; background: var(--bg);
+  border-radius: var(--radius); margin-bottom: 0.4rem;
+  font-family: 'Courier New', monospace; font-size: 1rem;
+}
+.rule-form {
+  display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: flex-end;
+}
+.rule-form input {
+  width: 70px; padding: 0.5rem;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--radius); color: var(--text);
+  font-size: 0.95rem; outline: none;
+}
+.rule-form input:focus { border-color: var(--accent); }
+
+/* Toast */
+.toast {
+  position: fixed; bottom: 2rem; right: 2rem;
+  padding: 0.75rem 1.5rem; border-radius: var(--radius);
+  color: #fff; font-weight: 600; font-size: 0.9rem;
+  z-index: 999; animation: slideIn 0.3s ease;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+.toast-error { background: var(--danger); }
+.toast-success { background: var(--success); color: #000; }
+@keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+</style>
+</head>
+<body>
+
+<!-- ── Auth View ── -->
+<div id="auth-container">
+  <h1>Calculator Login</h1>
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchAuthTab('login')">Login</button>
+    <button class="tab-btn" onclick="switchAuthTab('register')">Register</button>
+  </div>
+
+  <form id="login-form" onsubmit="handleLogin(event)">
+    <div class="form-group">
+      <label>Username</label>
+      <input type="text" id="login-username" placeholder="Username" required autocomplete="username">
+    </div>
+    <div class="form-group">
+      <label>Password</label>
+      <input type="password" id="login-password" placeholder="Password" required autocomplete="current-password">
+    </div>
+    <button type="submit" class="btn btn-primary">Sign In</button>
+    <div class="error-msg" id="login-error"></div>
+  </form>
+
+  <form id="register-form" class="hidden" onsubmit="handleRegister(event)">
+    <div class="form-group">
+      <label>Username</label>
+      <input type="text" id="reg-username" placeholder="Choose a username" required minlength="2" maxlength="32" autocomplete="username">
+    </div>
+    <div class="form-group">
+      <label>Password</label>
+      <input type="password" id="reg-password" placeholder="Choose a password" required minlength="3" maxlength="64" autocomplete="new-password">
+    </div>
+    <div class="form-group">
+      <label>Confirm Password</label>
+      <input type="password" id="reg-password2" placeholder="Confirm password" required>
+    </div>
+    <button type="submit" class="btn btn-primary">Create Account</button>
+    <div class="error-msg" id="register-error"></div>
+  </form>
+</div>
+
+<!-- ── App View ── -->
+<div id="app-container" class="hidden">
+  <div class="app-header">
+    <div class="user-info">
+      <span class="username" id="display-username"></span>
+      <span class="badge" id="display-role"></span>
+    </div>
+    <button class="btn btn-danger btn-sm" onclick="handleLogout()">Sign Out</button>
+  </div>
+
+  <!-- Calculator -->
+  <div class="calc-panel">
+    <div class="calc-display">
+      <div class="expression" id="calc-expression"></div>
+      <div class="result" id="calc-result"></div>
+      <div class="tampered-flag hidden" id="tampered-flag">&#9888; Result modified by superadmin rule</div>
+    </div>
+    <div class="num-pad" id="num-pad">
+      <button class="num-btn" onclick="inputNumber('7')">7</button>
+      <button class="num-btn" onclick="inputNumber('8')">8</button>
+      <button class="num-btn" onclick="inputNumber('9')">9</button>
+      <button class="num-btn op" id="btn-div" onclick="inputOperator('÷')">÷</button>
+
+      <button class="num-btn" onclick="inputNumber('4')">4</button>
+      <button class="num-btn" onclick="inputNumber('5')">5</button>
+      <button class="num-btn" onclick="inputNumber('6')">6</button>
+      <button class="num-btn op" id="btn-mul" onclick="inputOperator('×')">×</button>
+
+      <button class="num-btn" onclick="inputNumber('1')">1</button>
+      <button class="num-btn" onclick="inputNumber('2')">2</button>
+      <button class="num-btn" onclick="inputNumber('3')">3</button>
+      <button class="num-btn op" id="btn-sub" onclick="inputOperator('-')">−</button>
+
+      <button class="num-btn" onclick="inputNumber('0')">0</button>
+      <button class="num-btn" onclick="inputNumber('.')">.</button>
+      <button class="num-btn equals" onclick="calculate()">=</button>
+      <button class="num-btn op" id="btn-add" onclick="inputOperator('+')">+</button>
+
+      <button class="num-btn clear" onclick="clearCalc()" style="grid-column: span 4;">Clear (C)</button>
+    </div>
+  </div>
+
+  <!-- History Panel -->
+  <div class="panel">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+      <h2 style="margin-bottom: 0;">Recent Calculations</h2>
+      <button class="btn btn-danger btn-sm" onclick="clearHistory()">Clear History</button>
+    </div>
+    <div class="history-list" id="history-list">
+      <div class="empty-state">No calculations yet</div>
+    </div>
+  </div>
+
+  <!-- Admin Panel -->
+  <div class="panel hidden" id="admin-panel">
+    <h2>User Management</h2>
+    <table class="user-table">
+      <thead><tr><th>ID</th><th>Username</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody id="user-table-body"></tbody>
+    </table>
+  </div>
+
+  <!-- Superadmin Rules Panel -->
+  <div class="panel hidden" id="rules-panel">
+    <h2>Rule Tampering</h2>
+    <p style="font-size:0.85rem;color:var(--text2);margin-bottom:1rem;">
+      Override calculation results. Rules are in effect for ALL users until server restart.
+    </p>
+    <div class="rule-form" id="rule-form">
+      <input type="text" id="rule-a" placeholder="a" style="width:80px;">
+      <select id="rule-op" style="padding:0.5rem;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);">
+        <option value="+">+</option>
+        <option value="-">−</option>
+        <option value="*">×</option>
+        <option value="/">÷</option>
+      </select>
+      <input type="text" id="rule-b" placeholder="b" style="width:80px;">
+      <span>=</span>
+      <input type="text" id="rule-result" placeholder="result" style="width:80px;">
+      <button class="btn btn-warn btn-sm" onclick="addRule()">Override</button>
+    </div>
+    <div class="rules-list" id="rules-list" style="margin-top:1rem;">
+      <div class="empty-state">No active rules</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── State ──
+let currentUser = null;
+let calcA = '';
+let calcOp = '';
+let calcB = '';
+let calcPhase = 'a'; // 'a' | 'op' | 'b'
+
+// ── Auth ──
+function switchAuthTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  if (tab === 'login') {
+    document.querySelectorAll('.tab-btn')[0].classList.add('active');
+    document.getElementById('login-form').classList.remove('hidden');
+    document.getElementById('register-form').classList.add('hidden');
+  } else {
+    document.querySelectorAll('.tab-btn')[1].classList.add('active');
+    document.getElementById('login-form').classList.add('hidden');
+    document.getElementById('register-form').classList.remove('hidden');
+  }
+  document.getElementById('login-error').textContent = '';
+  document.getElementById('register-error').textContent = '';
+}
+
+async function postJSON(url, data) {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'same-origin',
+    body: JSON.stringify(data)
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+  return json;
+}
+
+async function getJSON(url) {
+  const res = await fetch(url, { credentials: 'same-origin' });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+  return json;
+}
+
+async function delJSON(url) {
+  const res = await fetch(url, { method: 'DELETE', credentials: 'same-origin' });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+  return json;
+}
+
+async function handleLogin(e) {
+  e.preventDefault();
+  const errEl = document.getElementById('login-error');
+  errEl.textContent = '';
+  const username = document.getElementById('login-username').value.trim();
+  const password = document.getElementById('login-password').value;
+  try {
+    const user = await postJSON('/api/login', { username, password });
+    currentUser = user;
+    showApp();
+  } catch (err) {
+    errEl.textContent = err.message;
+  }
+}
+
+async function handleRegister(e) {
+  e.preventDefault();
+  const errEl = document.getElementById('register-error');
+  errEl.textContent = '';
+  const username = document.getElementById('reg-username').value.trim();
+  const password = document.getElementById('reg-password').value;
+  const password2 = document.getElementById('reg-password2').value;
+  if (password !== password2) {
+    errEl.textContent = 'Passwords do not match';
+    return;
+  }
+  try {
+    await postJSON('/api/register', { username, password });
+    errEl.textContent = '';
+    showToast('Registration successful, please sign in', 'success');
+    switchAuthTab('login');
+    document.getElementById('login-username').value = username;
+    document.getElementById('login-password').value = '';
+  } catch (err) {
+    errEl.textContent = err.message;
+  }
+}
+
+async function handleLogout() {
+  try {
+    await postJSON('/api/logout', {});
+  } catch (_) {}
+  currentUser = null;
+  showAuth();
+}
+
+// ── App display ──
+function showAuth() {
+  document.getElementById('auth-container').classList.remove('hidden');
+  document.getElementById('app-container').classList.add('hidden');
+  clearCalc();
+}
+
+async function showApp() {
+  document.getElementById('auth-container').classList.add('hidden');
+  document.getElementById('app-container').classList.remove('hidden');
+  document.getElementById('display-username').textContent = currentUser.username;
+  document.getElementById('display-role').textContent = currentUser.role;
+
+  const roleBadge = document.getElementById('display-role');
+  roleBadge.className = 'badge badge-' + (currentUser.role === 'superadmin' ? 'superadmin' : currentUser.role === 'admin' ? 'admin' : currentUser.role === 'member' ? 'member' : 'guest');
+
+  updateCalcButtons();
+  clearCalc();
+  await loadHistory();
+
+  // Admin panel
+  if (currentUser.role === 'admin' || currentUser.role === 'superadmin') {
+    document.getElementById('admin-panel').classList.remove('hidden');
+    await loadUsers();
+  } else {
+    document.getElementById('admin-panel').classList.add('hidden');
+  }
+
+  // Rules panel
+  if (currentUser.role === 'superadmin') {
+    document.getElementById('rules-panel').classList.remove('hidden');
+    await loadRules();
+  } else {
+    document.getElementById('rules-panel').classList.add('hidden');
+  }
+}
+
+function updateCalcButtons() {
+  // Get allowed ops based on role
+  let allowedOps = ['+', '-'];
+  if (currentUser.role === 'member' || currentUser.role === 'admin' || currentUser.role === 'superadmin') {
+    allowedOps = ['+', '-', '×', '÷'];
+  }
+
+  const opMap = { '+': 'btn-add', '-': 'btn-sub', '−': 'btn-sub', '×': 'btn-mul', '÷': 'btn-div' };
+  // Disable all ops first
+  ['btn-add', 'btn-sub', 'btn-mul', 'btn-div'].forEach(id => {
+    document.getElementById(id).disabled = true;
+  });
+  // Enable allowed ops
+  allowedOps.forEach(op => {
+    const btnId = opMap[op] || ('btn-' + op);
+    const el = document.getElementById(btnId);
+    if (el) el.disabled = false;
+  });
+}
+
+// ── Calculator ──
+function inputNumber(num) {
+  if (calcPhase === 'a') {
+    if (num === '.' && calcA.includes('.')) return;
+    calcA += num;
+  } else if (calcPhase === 'op') {
+    calcPhase = 'b';
+    calcB = num;
+  } else {
+    if (num === '.' && calcB.includes('.')) return;
+    calcB += num;
+  }
+  updateDisplay();
+}
+
+function inputOperator(op) {
+  if (calcPhase === 'a' && calcA === '') return;
+  if (calcPhase === 'b' && calcB !== '') {
+    // Chain calculation
+    calculate();
+    return;
+  }
+  calcOp = op;
+  calcPhase = 'op';
+  updateDisplay();
+}
+
+function clearCalc() {
+  calcA = '';
+  calcOp = '';
+  calcB = '';
+  calcPhase = 'a';
+  updateDisplay();
+  document.getElementById('calc-result').textContent = '';
+  document.getElementById('tampered-flag').classList.add('hidden');
+}
+
+function updateDisplay() {
+  const opDisplay = { '+': '+', '-': '−', '*': '×', '/': '÷', '×': '×', '÷': '÷' };
+  let expr = calcA + ' ' + (opDisplay[calcOp] || calcOp) + ' ' + calcB;
+  if (calcPhase === 'a' && calcOp === '') expr = calcA;
+  document.getElementById('calc-expression').textContent = expr.trim();
+}
+
+async function calculate() {
+  if (calcPhase === 'a' && calcOp !== '' && calcB === '') return; // incomplete
+  if (calcPhase === 'op') return; // no second operand
+
+  const a = calcPhase === 'b' ? calcA : calcB;
+  const op = calcOp;
+  const b = calcPhase === 'b' ? calcB : '';
+
+  // Handle chaining: if we just pressed an operator, store the previous result
+  if (calcPhase === 'a' && calcOp !== '') {
+    // The user already hit equals, result displayed, then pressed op - handled by inputOperator
+    return;
+  }
+
+  if (!a || !op || !b) return;
+
+  const opMap = { '×': '*', '÷': '/' };
+  const serverOp = opMap[op] || op;
+
+  try {
+    const data = await postJSON('/api/calculate', { a, op: serverOp, b });
+    document.getElementById('calc-result').textContent = data.result;
+
+    if (data.tampered) {
+      document.getElementById('tampered-flag').classList.remove('hidden');
+    } else {
+      document.getElementById('tampered-flag').classList.add('hidden');
+    }
+
+    // Store result for chaining
+    calcA = String(data.result);
+    calcOp = '';
+    calcB = '';
+    calcPhase = 'a';
+
+    // Update history
+    loadHistory();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+// ── History ──
+async function loadHistory() {
+  try {
+    const data = await getJSON('/api/history');
+    const list = document.getElementById('history-list');
+    if (data.history.length === 0) {
+      list.innerHTML = '<div class="empty-state">No calculations yet</div>';
+      return;
+    }
+    list.innerHTML = data.history.map(h => `
+      <div class="history-item">
+        <span>
+          <span class="expr">${escapeHtml(h.expression)}</span>
+          ${h.tampered ? '<span class="tampered">[tampered]</span>' : ''}
+        </span>
+        <span class="res">= ${h.result}</span>
+        <span class="time">${h.created_at}</span>
+      </div>
+    `).join('');
+  } catch (err) {
+    // Silently fail for history
+  }
+}
+
+async function clearHistory() {
+  if (!confirm('Clear all your calculation history?')) return;
+  try {
+    await delJSON('/api/history');
+    showToast('History cleared', 'success');
+    loadHistory();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+// ── Admin ──
+async function loadUsers() {
+  try {
+    const data = await getJSON('/api/users');
+    const tbody = document.getElementById('user-table-body');
+    tbody.innerHTML = data.users.map(u => {
+      let actions = '';
+      if (currentUser.role === 'superadmin') {
+        if (u.role !== 'superadmin') {
+          actions += `<button class="btn btn-sm btn-warn" onclick="changeRole(${u.id},'guest')">Guest</button> `;
+          actions += `<button class="btn btn-sm btn-primary" onclick="changeRole(${u.id},'member')">Member</button> `;
+          actions += `<button class="btn btn-sm btn-success" onclick="changeRole(${u.id},'admin')">Admin</button> `;
+        }
+        if (u.id !== currentUser.id) {
+          actions += u.banned
+            ? `<button class="btn btn-sm btn-success" onclick="unbanUser(${u.id})">Unban</button>`
+            : `<button class="btn btn-sm btn-danger" onclick="banUser(${u.id})">Ban</button>`;
+        }
+      } else if (currentUser.role === 'admin') {
+        if (u.role === 'guest' || u.role === 'member') {
+          actions += `<button class="btn btn-sm btn-warn" onclick="changeRole(${u.id},'guest')">Guest</button> `;
+          actions += `<button class="btn btn-sm btn-primary" onclick="changeRole(${u.id},'member')">Member</button> `;
+          actions += u.banned
+            ? `<button class="btn btn-sm btn-success" onclick="unbanUser(${u.id})">Unban</button>`
+            : `<button class="btn btn-sm btn-danger" onclick="banUser(${u.id})">Ban</button>`;
+        }
+      }
+      const statusBadge = u.banned
+        ? '<span style="color:var(--danger);font-weight:600;">Banned</span>'
+        : '<span style="color:var(--success);">Active</span>';
+      return `
+        <tr>
+          <td>${u.id}</td>
+          <td>${escapeHtml(u.username)}</td>
+          <td><span class="badge badge-${u.role}">${u.role}</span></td>
+          <td>${statusBadge}</td>
+          <td class="actions">${actions}</td>
+        </tr>
+      `;
+    }).join('');
+  } catch (err) {
+    showToast('Failed to load users: ' + err.message, 'error');
+  }
+}
+
+async function changeRole(userId, role) {
+  try {
+    await postJSON('/api/users/role', { user_id: userId, role });
+    showToast('Role updated', 'success');
+    loadUsers();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+async function banUser(userId) {
+  if (!confirm('Ban this user? They will be unable to log in.')) return;
+  try {
+    await postJSON('/api/users/ban', { user_id: userId });
+    showToast('User banned', 'success');
+    loadUsers();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+async function unbanUser(userId) {
+  try {
+    await postJSON('/api/users/unban', { user_id: userId });
+    showToast('User unbanned', 'success');
+    loadUsers();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+// ── Superadmin Rules ──
+async function loadRules() {
+  try {
+    const data = await getJSON('/api/rules');
+    const list = document.getElementById('rules-list');
+    if (data.rules.length === 0) {
+      list.innerHTML = '<div class="empty-state">No active rules</div>';
+      return;
+    }
+    list.innerHTML = data.rules.map(r => `
+      <div class="rule-item">
+        <span>${escapeHtml(r.display)}</span>
+        <button class="btn btn-danger btn-sm" onclick="deleteRule(${r.id})">Delete</button>
+      </div>
+    `).join('');
+  } catch (err) {
+    showToast('Failed to load rules: ' + err.message, 'error');
+  }
+}
+
+async function addRule() {
+  const a = document.getElementById('rule-a').value.trim();
+  const op = document.getElementById('rule-op').value;
+  const b = document.getElementById('rule-b').value.trim();
+  const result = document.getElementById('rule-result').value.trim();
+  if (!a || !b || !result) {
+    showToast('Fill in all fields', 'error');
+    return;
+  }
+  const opMap = { '+': '+', '−': '-', '×': '*', '÷': '/' };
+  try {
+    await postJSON('/api/rules', { a, op: opMap[op] || op, b, result });
+    showToast('Rule added', 'success');
+    document.getElementById('rule-a').value = '';
+    document.getElementById('rule-b').value = '';
+    document.getElementById('rule-result').value = '';
+    loadRules();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+async function deleteRule(ruleId) {
+  try {
+    await delJSON('/api/rules/' + ruleId);
+    showToast('Rule deleted', 'success');
+    loadRules();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+// ── Toast ──
+function showToast(msg, type) {
+  const toast = document.createElement('div');
+  toast.className = 'toast toast-' + type;
+  toast.textContent = msg;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 3000);
+}
+
+// ── Utils ──
+function escapeHtml(s) {
+  const div = document.createElement('div');
+  div.textContent = s;
+  return div.innerHTML;
+}
+
+// ── Init ──
+(async function init() {
+  // Try to restore session
+  try {
+    const user = await getJSON('/api/me');
+    currentUser = user;
+    showApp();
+  } catch (_) {
+    showAuth();
+  }
+})();
+</script>
+
+</body>
+</html>

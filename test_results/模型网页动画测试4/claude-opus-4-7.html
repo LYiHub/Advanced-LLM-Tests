@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEXUS AI — 深境智能 · 流体大模型</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;}
+  :root{
+    --bg:#04070d;
+    --ink:#e9f1ff;
+    --ink-dim:rgba(233,241,255,0.65);
+    --accent:#5ec8ff;
+    --deep:#0a2540;
+  }
+  html,body{background:var(--bg);color:var(--ink);font-family:"Inter","PingFang SC","Helvetica Neue",Arial,sans-serif;overflow-x:hidden;-webkit-font-smoothing:antialiased;}
+  body{min-height:100vh;position:relative;}
+
+  /* ========= Liquid Background ========= */
+  .liquid-bg{
+    position:fixed;inset:0;z-index:-2;overflow:hidden;
+    background:
+      radial-gradient(ellipse at 20% 10%, #0a1a33 0%, transparent 55%),
+      radial-gradient(ellipse at 80% 90%, #07182e 0%, transparent 60%),
+      linear-gradient(180deg,#02050b 0%,#04070d 100%);
+  }
+  .blob{
+    position:absolute;border-radius:50%;filter:blur(80px);opacity:0.85;
+    mix-blend-mode:screen;will-change:transform,border-radius;
+  }
+  .blob.b1{width:55vw;height:55vw;left:-10vw;top:-10vw;background:radial-gradient(circle at 30% 30%,#1e6bd6,#0a2d6b 60%,transparent 75%);animation:float1 22s ease-in-out infinite, morph 14s ease-in-out infinite;}
+  .blob.b2{width:45vw;height:45vw;right:-8vw;top:20vh;background:radial-gradient(circle at 60% 40%,#1a9be3,#062447 55%,transparent 75%);animation:float2 28s ease-in-out infinite, morph 18s ease-in-out infinite reverse;}
+  .blob.b3{width:40vw;height:40vw;left:15vw;bottom:-10vw;background:radial-gradient(circle at 50% 50%,#2a5ecc,#071a3a 60%,transparent 78%);animation:float3 26s ease-in-out infinite, morph 16s ease-in-out infinite;}
+  .blob.b4{width:30vw;height:30vw;right:20vw;bottom:10vh;background:radial-gradient(circle at 50% 50%,#0f4c9c,#031028 60%,transparent 80%);animation:float4 30s ease-in-out infinite, morph 20s ease-in-out infinite;}
+
+  @keyframes float1{
+    0%,100%{transform:translate(0,0) rotate(0)}
+    33%{transform:translate(10vw,5vh) rotate(60deg)}
+    66%{transform:translate(-5vw,15vh) rotate(-30deg)}
+  }
+  @keyframes float2{
+    0%,100%{transform:translate(0,0) rotate(0)}
+    50%{transform:translate(-15vw,-10vh) rotate(90deg)}
+  }
+  @keyframes float3{
+    0%,100%{transform:translate(0,0) rotate(0)}
+    40%{transform:translate(8vw,-12vh) rotate(-45deg)}
+    70%{transform:translate(-10vw,6vh) rotate(40deg)}
+  }
+  @keyframes float4{
+    0%,100%{transform:translate(0,0) rotate(0)}
+    50%{transform:translate(12vw,8vh) rotate(120deg)}
+  }
+  @keyframes morph{
+    0%,100%{border-radius:42% 58% 63% 37% / 40% 45% 55% 60%}
+    25%{border-radius:60% 40% 30% 70% / 50% 60% 40% 50%}
+    50%{border-radius:35% 65% 55% 45% / 65% 35% 65% 35%}
+    75%{border-radius:55% 45% 68% 32% / 38% 62% 38% 62%}
+  }
+
+  /* Grain / noise overlay */
+  .grain{
+    position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:0.06;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.8'/></svg>");
+  }
+
+  /* Cursor light */
+  .cursor-glow{
+    position:fixed;top:0;left:0;width:600px;height:600px;border-radius:50%;
+    pointer-events:none;z-index:-1;transform:translate(-50%,-50%);
+    background:radial-gradient(circle, rgba(94,200,255,0.18) 0%, rgba(94,200,255,0.05) 30%, transparent 70%);
+    transition:transform 0.12s ease-out;
+    mix-blend-mode:screen;
+  }
+
+  /* ========= Glass ========= */
+  .glass{
+    background:linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 100%);
+    backdrop-filter: blur(22px) saturate(160%);
+    -webkit-backdrop-filter: blur(22px) saturate(160%);
+    border:1px solid rgba(255,255,255,0.12);
+    border-radius:22px;
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.15),
+      inset 0 -1px 0 rgba(255,255,255,0.04),
+      0 20px 60px rgba(0,0,0,0.4);
+    position:relative;overflow:hidden;
+  }
+  .glass::before{
+    content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+    background:linear-gradient(120deg, transparent 30%, rgba(255,255,255,0.08) 45%, transparent 60%);
+    opacity:0;transition:opacity 0.6s ease;
+  }
+  .glass:hover::before{opacity:1;}
+  .glass::after{
+    content:"";position:absolute;inset:-1px;border-radius:inherit;pointer-events:none;
+    background:
+      radial-gradient(circle at var(--mx,50%) var(--my,50%), rgba(160,220,255,0.25) 0%, transparent 40%);
+    opacity:0;transition:opacity 0.4s ease;
+    mix-blend-mode:screen;
+  }
+  .glass:hover::after{opacity:1;}
+
+  /* ========= Nav ========= */
+  nav{
+    position:fixed;top:20px;left:50%;transform:translateX(-50%);
+    z-index:100;padding:14px 28px;display:flex;align-items:center;gap:40px;
+    border-radius:999px;
+  }
+  .logo{font-weight:700;font-size:18px;letter-spacing:0.5px;display:flex;align-items:center;gap:10px;}
+  .logo-dot{width:10px;height:10px;border-radius:50%;background:radial-gradient(circle at 30% 30%,#8fd6ff,#0b4d8c);box-shadow:0 0 12px #5ec8ff;}
+  nav ul{display:flex;gap:28px;list-style:none;}
+  nav ul a{color:var(--ink-dim);text-decoration:none;font-size:14px;transition:color 0.3s;}
+  nav ul a:hover{color:var(--ink);}
+  .nav-cta{padding:8px 18px;border-radius:999px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);color:var(--ink);font-size:13px;cursor:pointer;transition:all 0.3s;}
+  .nav-cta:hover{background:rgba(255,255,255,0.15);}
+
+  /* ========= Hero ========= */
+  .hero{
+    min-height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;
+    padding:120px 6vw 80px;text-align:center;position:relative;
+  }
+  .eyebrow{
+    display:inline-flex;align-items:center;gap:10px;
+    padding:8px 18px;border-radius:999px;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;
+    color:var(--ink-dim);margin-bottom:32px;
+  }
+  .eyebrow .pulse{width:6px;height:6px;border-radius:50%;background:#5ec8ff;box-shadow:0 0 10px #5ec8ff;animation:pulse 2s infinite;}
+  @keyframes pulse{50%{opacity:0.3}}
+
+  h1{
+    font-size:clamp(44px,7vw,96px);font-weight:700;line-height:1.05;letter-spacing:-0.02em;
+    max-width:1100px;margin-bottom:28px;
+    background:linear-gradient(180deg,#ffffff 0%,#a8c8e8 100%);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  h1 .liquid-word{
+    background:linear-gradient(90deg,#5ec8ff,#7ae0ff,#3a8fd6,#5ec8ff);
+    background-size:300% 100%;
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    animation:shine 6s linear infinite;font-style:italic;font-weight:500;
+  }
+  @keyframes shine{0%{background-position:0% 50%}100%{background-position:300% 50%}}
+
+  .hero p.lead{
+    max-width:680px;font-size:clamp(15px,1.3vw,18px);color:var(--ink-dim);line-height:1.7;margin-bottom:44px;
+  }
+  .cta-row{display:flex;gap:16px;flex-wrap:wrap;justify-content:center;}
+  .btn{
+    padding:16px 32px;border-radius:999px;font-size:15px;cursor:pointer;
+    border:none;transition:all 0.4s cubic-bezier(.2,.8,.2,1);position:relative;overflow:hidden;
+    display:inline-flex;align-items:center;gap:10px;font-weight:500;
+  }
+  .btn-primary{
+    background:linear-gradient(135deg,rgba(255,255,255,0.95),rgba(200,230,255,0.85));
+    color:#031428;
+  }
+  .btn-primary:hover{transform:translateY(-2px);box-shadow:0 20px 40px rgba(94,200,255,0.35);}
+  .btn-ghost{
+    background:rgba(255,255,255,0.06);color:var(--ink);
+    border:1px solid rgba(255,255,255,0.18);backdrop-filter:blur(18px);
+  }
+  .btn-ghost:hover{background:rgba(255,255,255,0.12);}
+
+  /* Floating stats glass */
+  .hero-stats{
+    margin-top:80px;display:grid;grid-template-columns:repeat(4,1fr);gap:20px;
+    max-width:1000px;width:100%;
+  }
+  .stat{padding:28px 20px;text-align:left;}
+  .stat .num{font-size:32px;font-weight:600;background:linear-gradient(180deg,#fff,#7ab8e8);-webkit-background-clip:text;background-clip:text;color:transparent;}
+  .stat .lbl{font-size:12px;color:var(--ink-dim);margin-top:6px;letter-spacing:0.5px;}
+
+  /* ========= Sections ========= */
+  section.block{padding:100px 6vw;position:relative;}
+  .section-head{max-width:900px;margin-bottom:60px;}
+  .section-head .tag{font-size:12px;letter-spacing:2px;color:var(--accent);text-transform:uppercase;margin-bottom:16px;display:block;}
+  .section-head h2{font-size:clamp(32px,4vw,52px);font-weight:600;letter-spacing:-0.01em;line-height:1.15;margin-bottom:18px;}
+  .section-head p{color:var(--ink-dim);max-width:620px;line-height:1.7;}
+
+  /* Feature grid */
+  .features{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;}
+  .feature{padding:36px 32px;min-height:320px;display:flex;flex-direction:column;}
+  .feature .icon{
+    width:52px;height:52px;border-radius:16px;display:flex;align-items:center;justify-content:center;
+    background:linear-gradient(135deg,rgba(94,200,255,0.2),rgba(94,200,255,0.05));
+    border:1px solid rgba(94,200,255,0.25);margin-bottom:24px;
+  }
+  .feature .icon svg{width:26px;height:26px;stroke:#a8dcff;fill:none;stroke-width:1.5;}
+  .feature h3{font-size:22px;font-weight:600;margin-bottom:12px;}
+  .feature p{color:var(--ink-dim);font-size:14.5px;line-height:1.7;flex:1;}
+  .feature .more{margin-top:20px;font-size:13px;color:var(--accent);display:inline-flex;align-items:center;gap:6px;}
+
+  /* Products */
+  .products{display:grid;grid-template-columns:2fr 1fr;grid-template-rows:auto auto;gap:22px;}
+  .product{padding:40px;display:flex;flex-direction:column;justify-content:space-between;min-height:280px;}
+  .product.large{grid-row:span 2;min-height:580px;}
+  .product .pver{font-size:11px;letter-spacing:2px;color:var(--accent);text-transform:uppercase;margin-bottom:14px;}
+  .product h3{font-size:28px;font-weight:600;margin-bottom:14px;}
+  .product.large h3{font-size:42px;line-height:1.1;}
+  .product p{color:var(--ink-dim);font-size:14px;line-height:1.7;max-width:480px;}
+  .product .metrics{display:flex;gap:28px;margin-top:28px;}
+  .product .metrics div{font-size:12px;color:var(--ink-dim);}
+  .product .metrics strong{display:block;font-size:20px;color:var(--ink);font-weight:500;margin-bottom:4px;}
+
+  /* Orbit viz in large product */
+  .orbit{
+    position:absolute;right:-60px;bottom:-60px;width:420px;height:420px;pointer-events:none;opacity:0.55;
+  }
+  .orbit div{
+    position:absolute;inset:0;border:1px solid rgba(94,200,255,0.25);border-radius:50%;
+  }
+  .orbit div:nth-child(1){inset:0;animation:spin 20s linear infinite;}
+  .orbit div:nth-child(2){inset:40px;border-color:rgba(94,200,255,0.18);animation:spin 30s linear infinite reverse;}
+  .orbit div:nth-child(3){inset:90px;border-color:rgba(94,200,255,0.12);animation:spin 40s linear infinite;}
+  .orbit::before{content:"";position:absolute;top:50%;left:50%;width:60px;height:60px;border-radius:50%;transform:translate(-50%,-50%);background:radial-gradient(circle,#7ae0ff,#0a3a78 60%,transparent);box-shadow:0 0 40px #5ec8ff;}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* Capabilities strip */
+  .capabilities{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-top:40px;}
+  .cap{padding:22px;text-align:center;}
+  .cap .v{font-size:26px;font-weight:600;color:#fff;}
+  .cap .k{font-size:12px;color:var(--ink-dim);margin-top:6px;}
+
+  /* CTA */
+  .cta-section{padding:100px 6vw;}
+  .cta-card{
+    padding:70px 60px;text-align:center;position:relative;overflow:hidden;
+  }
+  .cta-card h2{font-size:clamp(32px,4vw,48px);font-weight:600;margin-bottom:18px;line-height:1.2;}
+  .cta-card p{color:var(--ink-dim);margin-bottom:36px;max-width:560px;margin-left:auto;margin-right:auto;}
+
+  /* Footer */
+  footer{padding:60px 6vw 40px;border-top:1px solid rgba(255,255,255,0.06);}
+  .foot-grid{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:40px;margin-bottom:40px;}
+  .foot-grid h4{font-size:13px;letter-spacing:1px;margin-bottom:18px;color:var(--ink);text-transform:uppercase;}
+  .foot-grid a{display:block;color:var(--ink-dim);text-decoration:none;font-size:14px;margin-bottom:10px;transition:color 0.3s;}
+  .foot-grid a:hover{color:var(--ink);}
+  .foot-brand p{color:var(--ink-dim);font-size:14px;line-height:1.7;max-width:320px;margin-top:14px;}
+  .foot-bottom{display:flex;justify-content:space-between;padding-top:30px;border-top:1px solid rgba(255,255,255,0.06);font-size:13px;color:var(--ink-dim);}
+
+  @media(max-width:900px){
+    nav{gap:16px;padding:10px 16px;}
+    nav ul{display:none;}
+    .hero-stats{grid-template-columns:repeat(2,1fr);}
+    .features{grid-template-columns:1fr;}
+    .products{grid-template-columns:1fr;}
+    .product.large{grid-row:auto;min-height:400px;}
+    .capabilities{grid-template-columns:repeat(2,1fr);}
+    .foot-grid{grid-template-columns:1fr 1fr;}
+    .cta-card{padding:50px 24px;}
+  }
+</style>
+</head>
+<body>
+
+<div class="liquid-bg">
+  <div class="blob b1"></div>
+  <div class="blob b2"></div>
+  <div class="blob b3"></div>
+  <div class="blob b4"></div>
+</div>
+<div class="grain"></div>
+<div class="cursor-glow" id="cursor"></div>
+
+<nav class="glass">
+  <div class="logo"><span class="logo-dot"></span> NEXUS&nbsp;AI</div>
+  <ul>
+    <li><a href="#products">模型矩阵</a></li>
+    <li><a href="#features">核心能力</a></li>
+    <li><a href="#research">前沿研究</a></li>
+    <li><a href="#docs">开发者</a></li>
+  </ul>
+  <button class="nav-cta">控制台 →</button>
+</nav>
+
+<header class="hero">
+  <div class="eyebrow glass"><span class="pulse"></span> NEXUS-3 万亿参数基座 · 已开放公测</div>
+  <h1>让智能<span class="liquid-word">如流水般</span><br>渗入每一处决策现场</h1>
+  <p class="lead">我们构建下一代多模态基座大模型。以液态神经架构为核心，融合视觉、语言、空间与推理，在极低延迟下完成复杂世界建模。</p>
+  <div class="cta-row">
+    <button class="btn btn-primary">立即体验 NEXUS-3 →</button>
+    <button class="btn btn-ghost">阅读技术白皮书</button>
+  </div>
+
+  <div class="hero-stats">
+    <div class="stat glass"><div class="num">1.8T</div><div class="lbl">活跃参数规模</div></div>
+    <div class="stat glass"><div class="num">128K</div><div class="lbl">上下文 Token</div></div>
+    <div class="stat glass"><div class="num">64ms</div><div class="lbl">端到端首响</div></div>
+    <div class="stat glass"><div class="num">42+</div><div class="lbl">支持语言与模态</div></div>
+  </div>
+</header>
+
+<section class="block" id="features">
+  <div class="section-head">
+    <span class="tag">Core Capabilities</span>
+    <h2>六项底层能力<br>重塑人与智能的边界</h2>
+    <p>从推理到创造，从感知到行动。我们把最前沿的研究封装为稳定、可调度、可组合的原子能力，供产品与工作流自由编排。</p>
+  </div>
+
+  <div class="features">
+    <div class="feature glass">
+      <div class="icon"><svg viewBox="0 0 24 24"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg></div>
+      <h3>深度推理引擎</h3>
+      <p>链式思维与搜索式推演并行，在数学竞赛、代码合成、法律推理等长链路任务上达到 SOTA 水平，并可输出可追溯的推理路径。</p>
+      <span class="more">查看基准 →</span>
+    </div>
+    <div class="feature glass">
+      <div class="icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 9h18M9 3v18"/></svg></div>
+      <h3>原生多模态</h3>
+      <p>图像、视频、音频、3D 点云与结构化数据在同一 Token 空间内统一建模，理解与生成无缝互通。</p>
+      <span class="more">观看演示 →</span>
+    </div>
+    <div class="feature glass">
+      <div class="icon"><svg viewBox="0 0 24 24"><path d="M4 4h16v6H4zM4 14h16v6H4zM8 7h.01M8 17h.01"/></svg></div>
+      <h3>企业级编排</h3>
+      <p>私有化部署、模型蒸馏、RAG 流水线与 Agent 调度一体化，支持 VPC 接入与细粒度权限审计。</p>
+      <span class="more">获取方案 →</span>
+    </div>
+    <div class="feature glass">
+      <div class="icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18M3 12h18"/></svg></div>
+      <h3>实时世界模型</h3>
+      <p>以状态空间架构持续建模物理与交互，驱动数字孪生、自动驾驶与机器人决策中的长时序预测。</p>
+      <span class="more">研究论文 →</span>
+    </div>
+    <div class="feature glass">
+      <div class="icon"><svg viewBox="0 0 24 24"><path d="M12 2l9 4v6c0 5-3.5 9-9 10-5.5-1-9-5-9-10V6z"/><path d="M9 12l2 2 4-4"/></svg></div>
+      <h3>可信与对齐</h3>
+      <p>宪法式对齐、红队评估与内置水印技术，在创造力与安全之间寻找最优张力。</p>
+      <span class="more">安全报告 →</span>
+    </div>
+    <div class="feature glass">
+      <div class="icon"><svg viewBox="0 0 24 24"><path d="M4 17l6-6 4 4 6-6M14 5h6v6"/></svg></div>
+      <h3>自演化 Agent</h3>
+      <p>具备记忆、工具使用与自我评估能力的 Agent 运行时，可在开放环境中持续学习并协同工作。</p>
+      <span class="more">构建 Agent →</span>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="products">
+  <div class="section-head">
+    <span class="tag">Model Matrix</span>
+    <h2>一个模型族<br>覆盖从研究到终端的全部尺度</h2>
+    <p>NEXUS 模型矩阵由三代基座与一系列专家模型组成，共享同一份预训练知识，按需裁剪为不同形态。</p>
+  </div>
+
+  <div class="products">
+    <div class="product large glass">
+      <div>
+        <div class="pver">FLAGSHIP · NEXUS-3</div>
+        <h3>旗舰基座<br>1.8 万亿液态架构</h3>
+        <p>以全新的 Liquid Transformer 架构替换传统稠密注意力，在长上下文任务中能耗降低 47%，推理精度反超同规模稠密模型 12.3 个百分点。</p>
+      </div>
+      <div class="metrics">
+        <div><strong>SOTA</strong>MMLU-Pro</div>
+        <div><strong>×3.1</strong>推理吞吐</div>
+        <div><strong>128K</strong>上下文窗口</div>
+      </div>
+      <div class="orbit"><div></div><div></div><div></div></div>
+    </div>
+
+    <div class="product glass">
+      <div>
+        <div class="pver">EFFICIENT · NEXUS-Lite</div>
+        <h3>边缘端轻量模型</h3>
+        <p>8B 参数，原生量化至 4-bit 后可在消费级 GPU 与移动芯片上以 30+ tok/s 稳定运行。</p>
+      </div>
+    </div>
+
+    <div class="product glass">
+      <div>
+        <div class="pver">VISION · NEXUS-Vision</div>
+        <h3>视觉理解专家</h3>
+        <p>支持 4K 原生分辨率输入，可完成细粒度 OCR、图表推理与视频时序因果分析。</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="capabilities">
+    <div class="cap glass"><div class="v">99.2%</div><div class="k">意图识别准确率</div></div>
+    <div class="cap glass"><div class="v">12×</div><div class="k">较上一代推理加速</div></div>
+    <div class="cap glass"><div class="v">0.04%</div><div class="k">幻觉率 (HaluEval)</div></div>
+    <div class="cap glass"><div class="v">SOC2</div><div class="k">企业安全合规</div></div>
+  </div>
+</section>
+
+<section class="cta-section">
+  <div class="cta-card glass">
+    <h2>将液态智能，注入你的产品</h2>
+    <p>从一行 API 调用到整条私有化智能链路，我们为你提供从实验室到生产环境的全部工具。</p>
+    <div class="cta-row" style="justify-content:center;">
+      <button class="btn btn-primary">免费开始 →</button>
+      <button class="btn btn-ghost">预约架构师</button>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="foot-grid">
+    <div class="foot-brand">
+      <div class="logo"><span class="logo-dot"></span> NEXUS&nbsp;AI</div>
+      <p>我们相信智能应如水般自由流动，渗透进每一个值得被理解的角落。总部位于深圳与苏黎世。</p>
+    </div>
+    <div>
+      <h4>产品</h4>
+      <a href="#">NEXUS-3 基座</a>
+      <a href="#">NEXUS-Lite</a>
+      <a href="#">NEXUS-Vision</a>
+      <a href="#">Agent Runtime</a>
+    </div>
+    <div>
+      <h4>开发者</h4>
+      <a href="#">API 文档</a>
+      <a href="#">模型广场</a>
+      <a href="#">定价方案</a>
+      <a href="#">状态页</a>
+    </div>
+    <div>
+      <h4>公司</h4>
+      <a href="#">关于我们</a>
+      <a href="#">研究团队</a>
+      <a href="#">加入我们</a>
+      <a href="#">新闻中心</a>
+    </div>
+  </div>
+  <div class="foot-bottom">
+    <span>© 2025 Nexus Intelligence Ltd. 保留所有权利。</span>
+    <span>Privacy · Terms · Security</span>
+  </div>
+</footer>
+
+<script>
+  // Cursor glow
+  const glow = document.getElementById('cursor');
+  let mx=window.innerWidth/2, my=window.innerHeight/2;
+  let tx=mx, ty=my;
+  window.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;});
+  function animateGlow(){
+    tx += (mx-tx)*0.12;
+    ty += (my-ty)*0.12;
+    glow.style.transform = `translate(${tx}px, ${ty}px) translate(-50%,-50%)`;
+    requestAnimationFrame(animateGlow);
+  }
+  animateGlow();
+
+  // Glass hover refraction (per-card spotlight)
+  document.querySelectorAll('.glass').forEach(el=>{
+    el.addEventListener('mousemove',e=>{
+      const r = el.getBoundingClientRect();
+      const x = ((e.clientX - r.left)/r.width)*100;
+      const y = ((e.clientY - r.top)/r.height)*100;
+      el.style.setProperty('--mx', x+'%');
+      el.style.setProperty('--my', y+'%');
+    });
+  });
+
+  // Parallax blobs with mouse
+  const blobs = document.querySelectorAll('.blob');
+  window.addEventListener('mousemove',e=>{
+    const cx = (e.clientX/window.innerWidth - 0.5);
+    const cy = (e.clientY/window.innerHeight - 0.5);
+    blobs.forEach((b,i)=>{
+      const depth = (i+1)*12;
+      b.style.marginLeft = (cx*depth)+'px';
+      b.style.marginTop = (cy*depth)+'px';
+    });
+  });
+
+  // Smooth scroll
+  document.querySelectorAll('a[href^="#"]').forEach(a=>{
+    a.addEventListener('click',e=>{
+      const id = a.getAttribute('href');
+      if(id.length>1){
+        const t = document.querySelector(id);
+        if(t){e.preventDefault();t.scrollIntoView({behavior:'smooth'});}
+      }
+    });
+  });
+</script>
+
+</body>
+</html>

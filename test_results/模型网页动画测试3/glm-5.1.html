@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>汽车变速箱工作原理 - 3D交互演示</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#060a10;--fg:#d0dce8;--muted:#3e5068;--accent:#00e0ff;--accent2:#ff2040;--accent3:#00ffa0;--card:rgba(8,18,32,0.82);--border:rgba(0,224,255,0.18)}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);overflow:hidden;color:var(--fg);font-family:'Rajdhani',sans-serif;user-select:none}
+#canvas-container{position:fixed;inset:0}
+.page-title{position:fixed;top:20px;left:28px;z-index:10;pointer-events:none}
+.page-title h1{font-family:'Orbitron',monospace;font-size:20px;font-weight:700;color:var(--accent);letter-spacing:3px;text-transform:uppercase;margin:0}
+.page-title p{font-size:12px;color:var(--muted);letter-spacing:5px;margin-top:4px}
+.control-panel{position:fixed;right:20px;top:50%;transform:translateY(-50%);width:240px;background:var(--card);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid var(--border);border-radius:14px;padding:22px;z-index:20;box-shadow:0 8px 32px rgba(0,0,0,0.5),inset 0 1px 0 rgba(255,255,255,0.04)}
+.panel-title{font-family:'Orbitron',monospace;font-size:13px;font-weight:700;color:var(--accent);letter-spacing:2px;text-transform:uppercase;margin-bottom:18px;padding-bottom:10px;border-bottom:1px solid var(--border)}
+.section-label{font-size:12px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;margin-top:16px}
+.section-label:first-of-type{margin-top:0}
+.rpm-slider{-webkit-appearance:none;width:100%;height:6px;border-radius:3px;background:linear-gradient(90deg,var(--accent2),var(--accent));outline:none;margin:8px 0}
+.rpm-slider::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:var(--fg);cursor:pointer;box-shadow:0 0 8px var(--accent)}
+.rpm-slider::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:var(--fg);cursor:pointer;border:none}
+.rpm-display{font-family:'Orbitron',monospace;font-size:22px;font-weight:900;color:var(--accent2);text-align:center;margin:4px 0 0}
+.rpm-unit{font-size:11px;color:var(--muted);font-weight:400;letter-spacing:2px}
+.gear-buttons{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:8px}
+.gear-btn{background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:8px;color:var(--fg);font-family:'Orbitron',monospace;font-size:14px;font-weight:700;padding:10px 0;cursor:pointer;transition:all .25s;position:relative;overflow:hidden}
+.gear-btn:hover{background:rgba(0,224,255,0.1);border-color:var(--accent)}
+.gear-btn.active{background:rgba(0,224,255,0.18);border-color:var(--accent);color:var(--accent);box-shadow:0 0 12px rgba(0,224,255,0.25)}
+.gear-btn.reverse.active{background:rgba(255,32,64,0.18);border-color:var(--accent2);color:var(--accent2);box-shadow:0 0 12px rgba(255,32,64,0.25)}
+.gear-btn.reverse:hover{background:rgba(255,32,64,0.1);border-color:var(--accent2)}
+.hud{position:fixed;left:28px;bottom:24px;z-index:20;pointer-events:none}
+.hud-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 24px}
+.hud-item{display:flex;flex-direction:column;gap:2px}
+.hud-label{font-size:10px;color:var(--muted);letter-spacing:2px;text-transform:uppercase}
+.hud-value{font-family:'Orbitron',monospace;font-size:18px;font-weight:700;color:var(--accent);line-height:1.2}
+.hud-value.red{color:var(--accent2)}
+.hud-value.green{color:var(--accent3)}
+.shift-indicator{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);font-family:'Orbitron',monospace;font-size:28px;font-weight:900;color:var(--accent);letter-spacing:4px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:30;text-shadow:0 0 20px var(--accent)}
+.shift-indicator.visible{opacity:1}
+.legend{position:fixed;right:20px;bottom:24px;z-index:20;font-size:11px;color:var(--muted);line-height:1.8}
+.legend-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle}
+@media(max-width:768px){.control-panel{right:10px;width:200px;padding:16px;font-size:12px}.page-title h1{font-size:16px}.hud-value{font-size:14px}}
+</style>
+</head>
+<body>
+<div id="canvas-container"></div>
+
+<div class="page-title">
+  <h1>Transmission 3D</h1>
+  <p>汽车变速箱工作原理</p>
+</div>
+
+<div class="control-panel">
+  <div class="panel-title">变速箱控制台</div>
+  <div class="section-label">发动机转速</div>
+  <input type="range" class="rpm-slider" id="rpm-slider" min="500" max="6000" value="800" step="50">
+  <div class="rpm-display"><span id="rpm-val">800</span> <span class="rpm-unit">RPM</span></div>
+  <div class="section-label">挡位选择</div>
+  <div class="gear-buttons">
+    <button class="gear-btn active" data-gear="N">N</button>
+    <button class="gear-btn" data-gear="1">1</button>
+    <button class="gear-btn" data-gear="2">2</button>
+    <button class="gear-btn" data-gear="3">3</button>
+    <button class="gear-btn reverse" data-gear="R">R</button>
+  </div>
+</div>
+
+<div class="hud">
+  <div class="hud-grid">
+    <div class="hud-item"><span class="hud-label">当前挡位</span><span class="hud-value" id="hud-gear">N</span></div>
+    <div class="hud-item"><span class="hud-label">传动比</span><span class="hud-value" id="hud-ratio">--</span></div>
+    <div class="hud-item"><span class="hud-label">离合器状态</span><span class="hud-value green" id="hud-clutch">接合</span></div>
+    <div class="hud-item"><span class="hud-label">输入 RPM</span><span class="hud-value red" id="hud-input">0</span></div>
+    <div class="hud-item"><span class="hud-label">输出 RPM</span><span class="hud-value" id="hud-output">0</span></div>
+  </div>
+</div>
+
+<div class="shift-indicator" id="shift-indicator"></div>
+
+<div class="legend">
+  <div><span class="legend-dot" style="background:#ff2040"></span>输入轴 / 发动机</div>
+  <div><span class="legend-dot" style="background:#8899aa"></span>中间轴</div>
+  <div><span class="legend-dot" style="background:#00c8dd"></span>输出轴</div>
+  <div><span class="legend-dot" style="background:#ff8800"></span>离合器</div>
+  <div><span class="legend-dot" style="background:#00ffa0"></span>同步器</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(function(){
+'use strict';
+
+/* ==================== 配置 ==================== */
+const SHAFT_Y = { input: 1.8, counter: 0, output: -1.8 };
+const GEAR_THICK = 0.28;
+const SHAFT_RADIUS = 0.055;
+const SHAFT_LEN = 12;
+const VIS_FACTOR = 0.0035;
+const SHIFT_DISENGAGE = 0.35;
+const SHIFT_MOVE = 0.3;
+const SHIFT_ENGAGE = 0.4;
+const LERP_SPEED = 4;
+
+const GEAR_DEFS = [
+  { id:'fixed', x:-3.2, dR:0.72, nR:0.72, dTeeth:16, nTeeth:16, ratio:1 },
+  { id:'1',     x:-1.2, dR:0.36, nR:1.08, dTeeth:8,  nTeeth:24, ratio:3 },
+  { id:'2',     x: 0.8, dR:0.48, nR:0.96, dTeeth:12, nTeeth:24, ratio:2 },
+  { id:'3',     x: 2.8, dR:0.72, nR:0.72, dTeeth:16, nTeeth:16, ratio:1 },
+];
+const REVERSE_DEF = { id:'R', x:4.8, dR:0.36, nR:1.08, dTeeth:8, nTeeth:24, idlerR:0.3, idlerTeeth:7, ratio:3 };
+
+/* ==================== 状态 ==================== */
+const state = {
+  currentGear:'N', targetGear:'N',
+  shiftPhase:'idle', shiftTimer:0,
+  engineRPM:800,
+  inputRPM:0, outputRPM:0,
+  clutchEng:1, targetClutchEng:1,
+  activeRatio:0, displayRatio:0,
+  syncTargetX:-1.2, syncCurrentX:-1.2,
+  inputAngle:0, counterAngle:0, outputAngle:0,
+  outputGearAngles:[0,0,0,0],
+  reverseAngle:0, idlerAngle:0,
+};
+
+/* ==================== 场景初始化 ==================== */
+const container = document.getElementById('canvas-container');
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x060a10, 0.035);
+
+const camera = new THREE.PerspectiveCamera(50, window.innerWidth/window.innerHeight, 0.1, 100);
+camera.position.set(2, 4, 9);
+
+const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:false });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+renderer.outputEncoding = THREE.sRGBEncoding;
+container.appendChild(renderer.domElement);
+
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.minDistance = 4;
+controls.maxDistance = 25;
+controls.target.set(1, 0, 0);
+
+/* ==================== 光照 ==================== */
+const ambLight = new THREE.AmbientLight(0x1a2a3a, 0.6);
+scene.add(ambLight);
+
+const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
+dirLight.position.set(5, 8, 4);
+scene.add(dirLight);
+
+const ptLight1 = new THREE.PointLight(0x00e0ff, 0.8, 20);
+ptLight1.position.set(-3, 3, 3);
+scene.add(ptLight1);
+
+const ptLight2 = new THREE.PointLight(0xff2040, 0.5, 15);
+ptLight2.position.set(3, -1, -2);
+scene.add(ptLight2);
+
+const ptLight3 = new THREE.PointLight(0x00ffa0, 0.3, 12);
+ptLight3.position.set(0, 0, 5);
+scene.add(ptLight3);
+
+/* ==================== 网格地面 ==================== */
+const gridHelper = new THREE.GridHelper(30, 60, 0x0a2040, 0x081828);
+gridHelper.position.y = -4;
+scene.add(gridHelper);
+
+const gridHelper2 = new THREE.GridHelper(30, 12, 0x0d3050, 0x0d3050);
+gridHelper2.position.y = -3.99;
+scene.add(gridHelper2);
+
+/* ==================== 材质库 ==================== */
+function makeMat(color, opts){
+  return new THREE.MeshStandardMaterial(Object.assign({
+    color:color, metalness:0.75, roughness:0.25
+  }, opts||{}));
+}
+const matInput = makeMat(0xff2040);
+const matCounter = makeMat(0x8899aa);
+const matOutput = makeMat(0x00c8dd);
+const matClutch = makeMat(0xff8800, {metalness:0.6, roughness:0.35});
+const matSync = makeMat(0x00ffa0, {metalness:0.5, roughness:0.3});
+const matHub = makeMat(0x1a1a2a, {metalness:0.9, roughness:0.1});
+const matHighlight = makeMat(0x00e0ff, {emissive:0x004466, emissiveIntensity:0.5});
+
+/* ==================== 齿轮生成 ==================== */
+function createGear(outerR, numTeeth, thickness, mat){
+  const group = new THREE.Group();
+  const toothH = Math.max(outerR*0.18, 0.04);
+  const baseR = Math.max(outerR - toothH, 0.02);
+
+  const discGeo = new THREE.CylinderGeometry(baseR, baseR, thickness, 48);
+  group.add(new THREE.Mesh(discGeo, mat));
+
+  const wireMat = new THREE.MeshBasicMaterial({color:mat.color, wireframe:true, transparent:true, opacity:0.12});
+  const wireDisc = new THREE.Mesh(discGeo.clone(), wireMat);
+  wireDisc.scale.set(1.003,1.003,1.003);
+  group.add(wireDisc);
+
+  const toothW = Math.max(2*baseR*Math.sin(Math.PI/numTeeth)*0.6, 0.01);
+  const toothGeo = new THREE.BoxGeometry(toothW, thickness, toothH);
+  for(let i=0;i<numTeeth;i++){
+    const a = (i/numTeeth)*Math.PI*2;
+    const r = baseR + toothH/2;
+    const t = new THREE.Mesh(toothGeo, mat);
+    t.position.set(Math.cos(a)*r, 0, Math.sin(a)*r);
+    t.rotation.y = Math.PI/2 - a;
+    group.add(t);
+  }
+
+  const hubR = Math.max(baseR*0.18, 0.015);
+  const hubGeo = new THREE.CylinderGeometry(hubR, hubR, thickness*2, 12);
+  group.add(new THREE.Mesh(hubGeo, matHub));
+
+  const nSpokes = Math.min(Math.max(Math.floor(numTeeth/4),3),6);
+  const spokeLen = Math.max(baseR - hubR - 0.02, 0.01);
+  const spokeGeo = new THREE.BoxGeometry(spokeLen, thickness*0.25, thickness*0.12);
+  for(let i=0;i<nSpokes;i++){
+    const a = (i/nSpokes)*Math.PI*2;
+    const midR = hubR + spokeLen/2 + 0.01;
+    const s = new THREE.Mesh(spokeGeo, matHub);
+    s.position.set(Math.cos(a)*midR, 0, Math.sin(a)*midR);
+    s.rotation.y = Math.PI/2 - a;
+    group.add(s);
+  }
+
+  return group;
+}
+
+/* ==================== 轴生成 ==================== */
+function createShaft(y, len, mat){
+  const geo = new THREE.CylinderGeometry(SHAFT_RADIUS, SHAFT_RADIUS, len, 16);
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.rotation.z = -Math.PI/2;
+  mesh.position.set(0, y, 0);
+  return mesh;
+}
+
+/* ==================== 离合器 ==================== */
+const clutchGroup = new THREE.Group();
+(function buildClutch(){
+  const x = -4.5;
+  const discR = 0.55;
+  const discT = 0.06;
+
+  const geo1 = new THREE.CylinderGeometry(discR, discR, discT, 32);
+  const flywheel = new THREE.Mesh(geo1, matInput);
+  clutchGroup.add(flywheel);
+
+  const geo2 = new THREE.CylinderGeometry(discR*0.9, discR*0.9, discT, 32);
+  const clutchDisc = new THREE.Mesh(geo2, matClutch);
+  clutchDisc.position.y = discT + 0.01;
+  clutchGroup.add(clutchDisc);
+  clutchGroup.userData.disc = clutchDisc;
+  clutchGroup.userData.baseY = discT + 0.01;
+
+  const ringGeo = new THREE.TorusGeometry(discR*0.7, 0.02, 8, 32);
+  const ring = new THREE.Mesh(ringGeo, matClutch);
+  ring.rotation.x = Math.PI/2;
+  ring.position.y = discT*2 + 0.02;
+  clutchGroup.add(ring);
+  clutchGroup.userData.ring = ring;
+  clutchGroup.userData.ringBaseY = discT*2 + 0.02;
+
+  clutchGroup.rotation.z = -Math.PI/2;
+  clutchGroup.position.set(x, SHAFT_Y.input, 0);
+})();
+scene.add(clutchGroup);
+
+/* ==================== 同步器 ==================== */
+const syncGroup = new THREE.Group();
+(function buildSync(){
+  const r = 0.18;
+  const geo = new THREE.CylinderGeometry(r, r, 0.18, 24);
+  const mesh = new THREE.Mesh(geo, matSync);
+  syncGroup.add(mesh);
+
+  const ringGeo = new THREE.TorusGeometry(r+0.04, 0.025, 8, 24);
+  const ring = new THREE.Mesh(ringGeo, matSync);
+  ring.rotation.x = Math.PI/2;
+  syncGroup.add(ring);
+
+  const wireGeo = new THREE.CylinderGeometry(r+0.06, r+0.06, 0.2, 24);
+  const wireMat2 = new THREE.MeshBasicMaterial({color:0x00ffa0, wireframe:true, transparent:true, opacity:0.2});
+  syncGroup.add(new THREE.Mesh(wireGeo, wireMat2));
+
+  syncGroup.rotation.z = -Math.PI/2;
+  syncGroup.position.set(-1.2, SHAFT_Y.output, 0);
+})();
+scene.add(syncGroup);
+
+/* ==================== 组装变速箱 ==================== */
+const allGearGroups = [];
+const activeHighlightRings = [];
+
+function buildGearOnShaft(def, shaftY, isDrive){
+  const alignGroup = new THREE.Group();
+  alignGroup.rotation.z = -Math.PI/2;
+  alignGroup.position.set(def.x, shaftY, 0);
+
+  const spinGroup = new THREE.Group();
+  alignGroup.add(spinGroup);
+
+  const r = isDrive ? def.dR : def.nR;
+  const teeth = isDrive ? def.dTeeth : def.nTeeth;
+  const mat = shaftY === SHAFT_Y.input ? matInput : (shaftY === SHAFT_Y.counter ? matCounter : matOutput);
+  const gear = createGear(r, teeth, GEAR_THICK, mat);
+  spinGroup.add(gear);
+
+  scene.add(alignGroup);
+  return { alignGroup, spinGroup, gear, def, isDrive };
+}
+
+const inputGears = [];
+const counterGears = [];
+const outputGears = [];
+
+GEAR_DEFS.forEach(function(def){
+  inputGears.push(buildGearOnShaft(def, SHAFT_Y.input, true));
+  counterGears.push(buildGearOnShaft(def, SHAFT_Y.counter, true));
+  outputGears.push(buildGearOnShaft(def, SHAFT_Y.output, false));
+
+  const highlightRing = new THREE.Mesh(
+    new THREE.TorusGeometry((def.nR||def.dR)+0.12, 0.015, 8, 48),
+    new THREE.MeshBasicMaterial({color:0x00e0ff, transparent:true, opacity:0})
+  );
+  highlightRing.rotation.x = Math.PI/2;
+  highlightRing.position.set(def.x, SHAFT_Y.output, 0);
+  scene.add(highlightRing);
+  activeHighlightRings.push(highlightRing);
+});
+
+const revCounter = buildGearOnShaft(REVERSE_DEF, SHAFT_Y.counter, true);
+counterGears.push(revCounter);
+const revOutput = buildGearOnShaft(REVERSE_DEF, SHAFT_Y.output, false);
+outputGears.push(revOutput);
+
+const idlerAlign = new THREE.Group();
+idlerAlign.rotation.z = -Math.PI/2;
+idlerAlign.position.set(REVERSE_DEF.x, -0.9, 0.55);
+const idlerSpin = new THREE.Group();
+idlerAlign.add(idlerSpin);
+const idlerGear = createGear(REVERSE_DEF.idlerR, REVERSE_DEF.idlerTeeth, GEAR_THICK, makeMat(0x667788));
+idlerSpin.add(idlerGear);
+scene.add(idlerAlign);
+
+const revHighlightRing = new THREE.Mesh(
+  new THREE.TorusGeometry(REVERSE_DEF.nR+0.12, 0.015, 8, 48),
+  new THREE.MeshBasicMaterial({color:0xff2040, transparent:true, opacity:0})
+);
+revHighlightRing.rotation.x = Math.PI/2;
+revHighlightRing.position.set(REVERSE_DEF.x, SHAFT_Y.output, 0);
+scene.add(revHighlightRing);
+activeHighlightRings.push(revHighlightRing);
+
+/* 轴体 */
+const inputShaftVis = createShaft(SHAFT_Y.input, SHAFT_LEN, matInput);
+scene.add(inputShaftVis);
+const counterShaftVis = createShaft(SHAFT_Y.counter, SHAFT_LEN, matCounter);
+scene.add(counterShaftVis);
+const outputShaftVis = createShaft(SHAFT_Y.output, SHAFT_LEN, matOutput);
+scene.add(outputShaftVis);
+
+/* 轴上标记环（显示旋转） */
+function addShaftRings(y, mat, count){
+  const rings = [];
+  for(let i=0;i<count;i++){
+    const rg = new THREE.TorusGeometry(SHAFT_RADIUS+0.02, 0.012, 6, 16);
+    const rm = new THREE.Mesh(rg, mat);
+    rm.rotation.x = Math.PI/2;
+    rm.position.set(-5+i*2.5, y, 0);
+    scene.add(rm);
+    rings.push(rm);
+  }
+  return rings;
+}
+const inputRings = addShaftRings(SHAFT_Y.input, matInput, 5);
+const counterRings = addShaftRings(SHAFT_Y.counter, matCounter, 5);
+const outputRings = addShaftRings(SHAFT_Y.output, matOutput, 5);
+
+/* 连接线（轴名标注用装饰） */
+function addAxisLabel(text, x, y, color){
+  const canvas = document.createElement('canvas');
+  canvas.width = 256; canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = color;
+  ctx.font = 'bold 28px Orbitron, monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(text, 128, 40);
+  const tex = new THREE.CanvasTexture(canvas);
+  const spr = new THREE.Sprite(new THREE.SpriteMaterial({map:tex, transparent:true, opacity:0.6}));
+  spr.position.set(x, y+0.5, 0);
+  spr.scale.set(2, 0.5, 1);
+  scene.add(spr);
+}
+addAxisLabel('INPUT', -5.5, SHAFT_Y.input, '#ff2040');
+addAxisLabel('COUNTER', -5.5, SHAFT_Y.counter, '#8899aa');
+addAxisLabel('OUTPUT', -5.5, SHAFT_Y.output, '#00c8dd');
+
+/* ==================== 换挡逻辑 ==================== */
+const gearRatios = {'N':0,'1':3,'2':2,'3':1,'R':-3};
+const gearXPositions = {'N':-1.2,'1':-1.2,'2':0.8,'3':2.8,'R':4.8};
+const gearToDefIdx = {'1':1,'2':2,'3':3};
+
+function startShift(newGear){
+  if(newGear === state.currentGear && state.shiftPhase === 'idle') return;
+  state.targetGear = newGear;
+  state.shiftPhase = 'disengage';
+  state.shiftTimer = 0;
+  state.targetClutchEng = 0;
+  state.syncTargetX = gearXPositions[newGear];
+  showShiftIndicator(newGear);
+}
+
+function showShiftIndicator(g){
+  const el = document.getElementById('shift-indicator');
+  const labels = {'N':'NEUTRAL','1':'1ST GEAR','2':'2ND GEAR','3':'3RD GEAR','R':'REVERSE'};
+  el.textContent = labels[g]||g;
+  el.classList.add('visible');
+  clearTimeout(el._timer);
+  el._timer = setTimeout(function(){ el.classList.remove('visible'); }, 1200);
+}
+
+function updateShiftLogic(dt){
+  if(state.shiftPhase === 'idle') return;
+  state.shiftTimer += dt;
+
+  if(state.shiftPhase === 'disengage'){
+    state.clutchEng = Math.max(0, state.clutchEng - dt/SHIFT_DISENGAGE);
+    if(state.shiftTimer >= SHIFT_DISENGAGE){
+      state.clutchEng = 0;
+      state.shiftPhase = 'shift';
+      state.shiftTimer = 0;
+    }
+  } else if(state.shiftPhase === 'shift'){
+    const t = Math.min(state.shiftTimer/SHIFT_MOVE, 1);
+    const ease = t*t*(3-2*t);
+    state.syncCurrentX += (state.syncTargetX - state.syncCurrentX) * Math.min(ease*2, 1) * dt * 8;
+    if(state.shiftTimer >= SHIFT_MOVE){
+      state.syncCurrentX = state.syncTargetX;
+      state.shiftPhase = 'engage';
+      state.shiftTimer = 0;
+      state.currentGear = state.targetGear;
+      state.activeRatio = gearRatios[state.currentGear];
+      state.targetClutchEng = 1;
+    }
+  } else if(state.shiftPhase === 'engage'){
+    state.clutchEng = Math.min(1, state.clutchEng + dt/SHIFT_ENGAGE);
+    if(state.shiftTimer >= SHIFT_ENGAGE){
+      state.clutchEng = 1;
+      state.shiftPhase = 'idle';
+    }
+  }
+}
+
+/* ==================== 物理更新 ==================== */
+function updatePhysics(dt){
+  updateShiftLogic(dt);
+
+  const targetInput = state.engineRPM * state.clutchEng;
+  state.inputRPM += (targetInput - state.inputRPM) * Math.min(LERP_SPEED * dt, 1);
+
+  let targetOutput = 0;
+  const r = gearRatios[state.currentGear] || 0;
+  if(r !== 0 && state.clutchEng > 0.1){
+    targetOutput = state.inputRPM / Math.abs(r) * Math.sign(r) * state.clutchEng;
+  }
+  state.outputRPM += (targetOutput - state.outputRPM) * Math.min(LERP_SPEED * 0.5 * dt, 1);
+  state.displayRatio += (r - state.displayRatio) * Math.min(3 * dt, 1);
+
+  state.inputAngle += state.inputRPM * VIS_FACTOR * dt;
+  state.counterAngle += -state.inputRPM * VIS_FACTOR * dt;
+  state.outputAngle += state.outputRPM * VIS_FACTOR * dt;
+
+  GEAR_DEFS.forEach(function(def, i){
+    const ratio = def.ratio;
+    state.outputGearAngles[i] += (state.inputRPM / ratio) * VIS_FACTOR * dt;
+  });
+  state.reverseAngle += (-state.inputRPM / REVERSE_DEF.ratio) * VIS_FACTOR * dt;
+  state.idlerAngle += state.inputRPM * (REVERSE_DEF.dR / REVERSE_DEF.idlerR) * VIS_FACTOR * dt;
+}
+
+/* ==================== 视觉更新 ==================== */
+function updateVisuals(dt){
+  inputGears.forEach(function(g){
+    g.spinGroup.rotation.y = state.inputAngle;
+  });
+  counterGears.forEach(function(g){
+    g.spinGroup.rotation.y = state.counterAngle;
+  });
+  outputGears.forEach(function(g, i){
+    if(i < GEAR_DEFS.length){
+      g.spinGroup.rotation.y = state.outputGearAngles[i];
+    } else {
+      g.spinGroup.rotation.y = state.reverseAngle;
+    }
+  });
+  idlerSpin.rotation.y = state.idlerAngle;
+
+  inputRings.forEach(function(r){ r.rotation.z = state.inputAngle; });
+  counterRings.forEach(function(r){ r.rotation.z = state.counterAngle; });
+  outputRings.forEach(function(r){ r.rotation.z = state.outputAngle; });
+
+  syncGroup.position.x += (state.syncTargetX - syncGroup.position.x) * Math.min(6*dt, 1);
+
+  const clutchGap = (1 - state.clutchEng) * 0.3;
+  if(clutchGroup.userData.disc){
+    clutchGroup.userData.disc.position.y = clutchGroup.userData.baseY + clutchGap;
+    clutchGroup.userData.ring.position.y = clutchGroup.userData.ringBaseY + clutchGap * 0.5;
+  }
+
+  const idx = gearToDefIdx[state.currentGear];
+  activeHighlightRings.forEach(function(ring, i){
+    let target = 0;
+    if(state.currentGear === 'R' && i === activeHighlightRings.length-1) target = 0.6;
+    else if(idx !== undefined && i === idx) target = 0.6;
+    ring.material.opacity += (target - ring.material.opacity) * Math.min(4*dt, 1);
+  });
+}
+
+/* ==================== HUD 更新 ==================== */
+function updateHUD(){
+  document.getElementById('hud-gear').textContent = state.currentGear;
+  const r = gearRatios[state.currentGear];
+  document.getElementById('hud-ratio').textContent = r === 0 ? '--' : (r < 0 ? r.toFixed(1) : r.toFixed(1)) + ' : 1';
+  const clutchEl = document.getElementById('hud-clutch');
+  if(state.clutchEng > 0.9){
+    clutchEl.textContent = '接合';
+    clutchEl.className = 'hud-value green';
+  } else if(state.clutchEng < 0.1){
+    clutchEl.textContent = '分离';
+    clutchEl.className = 'hud-value red';
+  } else {
+    clutchEl.textContent = '滑动 ' + Math.round(state.clutchEng*100) + '%';
+    clutchEl.className = 'hud-value';
+    clutchEl.style.color = '#ff8800';
+  }
+  document.getElementById('hud-input').textContent = Math.round(state.inputRPM);
+  document.getElementById('hud-output').textContent = Math.round(Math.abs(state.outputRPM));
+}
+
+/* ==================== UI 事件 ==================== */
+const rpmSlider = document.getElementById('rpm-slider');
+const rpmVal = document.getElementById('rpm-val');
+rpmSlider.addEventListener('input', function(){
+  state.engineRPM = parseInt(this.value);
+  rpmVal.textContent = this.value;
+});
+
+document.querySelectorAll('.gear-btn').forEach(function(btn){
+  btn.addEventListener('click', function(){
+    const gear = this.dataset.gear;
+    startShift(gear);
+    document.querySelectorAll('.gear-btn').forEach(function(b){ b.classList.remove('active'); });
+    this.classList.add('active');
+  });
+});
+
+document.addEventListener('keydown', function(e){
+  const map = {'n':'N','1':'1','2':'2','3':'3','r':'R'};
+  const g = map[e.key.toLowerCase()];
+  if(g){
+    startShift(g);
+    document.querySelectorAll('.gear-btn').forEach(function(b){
+      b.classList.toggle('active', b.dataset.gear === g);
+    });
+  }
+});
+
+/* ==================== 背景粒子 ==================== */
+const particleCount = 200;
+const pGeo = new THREE.BufferGeometry();
+const pPos = new Float32Array(particleCount*3);
+for(let i=0;i<particleCount;i++){
+  pPos[i*3] = (Math.random()-0.5)*30;
+  pPos[i*3+1] = (Math.random()-0.5)*20;
+  pPos[i*3+2] = (Math.random()-0.5)*30;
+}
+pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+const pMat = new THREE.PointsMaterial({color:0x1a4a6a, size:0.04, transparent:true, opacity:0.5});
+scene.add(new THREE.Points(pGeo, pMat));
+
+/* ==================== 动画循环 ==================== */
+let lastTime = 0;
+function animate(time){
+  requestAnimationFrame(animate);
+  const dt = Math.min((time - lastTime)/1000, 0.05);
+  lastTime = time;
+
+  updatePhysics(dt);
+  updateVisuals(dt);
+  updateHUD();
+
+  ptLight1.intensity = 0.6 + Math.sin(time*0.002)*0.2;
+  ptLight3.position.x = Math.sin(time*0.0005)*3;
+  ptLight3.position.z = Math.cos(time*0.0007)*3 + 2;
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+requestAnimationFrame(animate);
+
+/* ==================== 窗口适配 ==================== */
+window.addEventListener('resize', function(){
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+})();
+</script>
+</body>
+</html>
+```
+
+这个实现包含了一个完整的3D汽车变速箱交互式演示，主要特性如下：
+
+**三轴模型**：输入轴（红色）、中间轴（灰色）、输出轴（青色），真实模拟了手动变速箱的传动结构。固定齿轮对始终将动力从输入轴传递到中间轴，各挡位齿轮对在中间轴与输出轴之间按不同传动比工作。
+
+**齿轮系统**：每个齿轮由圆盘主体、齿牙、轮毂和辐条组成，搭配半透明线框叠层，呈现工业透视感。齿轮大小严格按照传动比设计（一挡3:1、二挡2:1、三挡1:1），倒挡额外配备了惰轮实现反向输出。
+
+**换挡动画**：切换挡位时经历三阶段——离合器分离（0.35s）→ 同步器轴向滑移（0.3s）→ 离合器接合（0.4s），所有过渡均使用缓动函数平滑处理。离合器片视觉上会分离和靠拢，同步器沿输出轴滑动到目标位置。
+
+**控制面板**：毛玻璃风格UI，RPM滑块实时调节发动机转速，挡位按钮支持点击和键盘快捷键（N/1/2/3/R）。HUD实时显示传动比、离合器状态、输入/输出RPM。
+
+**视觉风格**：深色蓝图主题，网格地面，动态点光源，背景微粒，选中挡位齿轮会有青色光环高亮提示。

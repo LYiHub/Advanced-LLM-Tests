@@ -1,0 +1,1067 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>交互式汽车变速箱工作原理3D演示</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
+    <script>
+        // OrbitControls 内联引入 (r128版本)
+        THREE.OrbitControls = function (object, domElement) {
+            this.object = object;
+            this.domElement = (domElement !== undefined) ? domElement : document;
+            this.target = new THREE.Vector3();
+            this.minDistance = 0;
+            this.maxDistance = Infinity;
+            this.minZoom = 0;
+            this.maxZoom = Infinity;
+            this.minPolarAngle = 0;
+            this.maxPolarAngle = Math.PI;
+            this.minAzimuthAngle = -Infinity;
+            this.maxAzimuthAngle = Infinity;
+            this.enableDamping = false;
+            this.dampingFactor = 0.05;
+            this.enableZoom = true;
+            this.zoomSpeed = 1.0;
+            this.enableRotate = true;
+            this.rotateSpeed = 1.0;
+            this.enablePan = true;
+            this.panSpeed = 1.0;
+            this.screenSpacePanning = true;
+            this.keyPanSpeed = 7.0;
+            this.autoRotate = false;
+            this.autoRotateSpeed = 2.0;
+            this.enableKeys = true;
+            this.keys = { LEFT: 37, UP: 38, RIGHT: 39, BOTTOM: 40 };
+            this.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
+            this.touches = { ONE: THREE.MOUSE.ROTATE, TWO: THREE.MOUSE.DOLLY_PAN };
+            this.target0 = this.target.clone();
+            this.position0 = this.object.position.clone();
+            this.zoom0 = this.object.zoom;
+
+            var scope = this;
+            var changeEvent = { type: 'change' };
+            var startEvent = { type: 'start' };
+            var endEvent = { type: 'end' };
+            var STATE = { NONE: -1, ROTATE: 0, DOLLY: 1, PAN: 2, TOUCH_ROTATE: 3, TOUCH_PAN: 4, TOUCH_DOLLY_PAN: 5, TOUCH_DOLLY_ROTATE: 6 };
+            var state = STATE.NONE;
+            var EPS = 0.000001;
+            var spherical = new THREE.Spherical();
+            var sphericalDelta = new THREE.Spherical();
+            var scale = 1;
+            var panOffset = new THREE.Vector3();
+            var zoomChanged = false;
+            var rotateStart = new THREE.Vector2();
+            var rotateEnd = new THREE.Vector2();
+            var rotateDelta = new THREE.Vector2();
+            var panStart = new THREE.Vector2();
+            var panEnd = new THREE.Vector2();
+            var panDelta = new THREE.Vector2();
+            var dollyStart = new THREE.Vector2();
+            var dollyEnd = new THREE.Vector2();
+            var dollyDelta = new THREE.Vector2();
+
+            function getAutoRotationAngle() {
+                return 2 * Math.PI / 60 / 60 * scope.autoRotateSpeed;
+            }
+
+            function getZoomScale() {
+                return Math.pow(0.95, scope.zoomSpeed);
+            }
+
+            function rotateLeft(angle) {
+                sphericalDelta.theta -= angle;
+            }
+
+            function rotateUp(angle) {
+                sphericalDelta.phi -= angle;
+            }
+
+            var panLeft = function () {
+                var v = new THREE.Vector3();
+                return function panLeft(distance, objectMatrix) {
+                    v.setFromMatrixColumn(objectMatrix, 0);
+                    v.multiplyScalar(-distance);
+                    panOffset.add(v);
+                };
+            }();
+
+            var panUp = function () {
+                var v = new THREE.Vector3();
+                return function panUp(distance, objectMatrix) {
+                    if (scope.screenSpacePanning === true) {
+                        v.setFromMatrixColumn(objectMatrix, 1);
+                    } else {
+                        v.setFromMatrixColumn(objectMatrix, 0);
+                        v.crossVectors(scope.object.up, v);
+                    }
+                    v.multiplyScalar(distance);
+                    panOffset.add(v);
+                };
+            }();
+
+            var pan = function () {
+                var offset = new THREE.Vector3();
+                return function pan(deltaX, deltaY) {
+                    var element = scope.domElement;
+                    if (scope.object.isPerspectiveCamera) {
+                        var position = scope.object.position;
+                        offset.copy(position).sub(scope.target);
+                        var targetDistance = offset.length();
+                        targetDistance *= Math.tan((scope.object.fov / 2) * Math.PI / 180.0);
+                        panLeft(2 * deltaX * targetDistance / element.clientHeight, scope.object.matrix);
+                        panUp(2 * deltaY * targetDistance / element.clientHeight, scope.object.matrix);
+                    } else if (scope.object.isOrthographicCamera) {
+                        panLeft(deltaX * (scope.object.right - scope.object.left) / scope.object.zoom / element.clientWidth, scope.object.matrix);
+                        panUp(deltaY * (scope.object.top - scope.object.bottom) / scope.object.zoom / element.clientHeight, scope.object.matrix);
+                    } else {
+                        console.warn('WARNING: OrbitControls.js encountered an unknown camera type - pan disabled.');
+                        scope.enablePan = false;
+                    }
+                };
+            }();
+
+            function dollyOut(dollyScale) {
+                if (scope.object.isPerspectiveCamera) {
+                    scale /= dollyScale;
+                } else if (scope.object.isOrthographicCamera) {
+                    scope.object.zoom = Math.max(scope.minZoom, Math.min(scope.maxZoom, scope.object.zoom * dollyScale));
+                    scope.object.updateProjectionMatrix();
+                    zoomChanged = true;
+                } else {
+                    console.warn('WARNING: OrbitControls.js encountered an unknown camera type - dolly/zoom disabled.');
+                    scope.enableZoom = false;
+                }
+            }
+
+            function dollyIn(dollyScale) {
+                if (scope.object.isPerspectiveCamera) {
+                    scale *= dollyScale;
+                } else if (scope.object.isOrthographicCamera) {
+                    scope.object.zoom = Math.max(scope.minZoom, Math.min(scope.maxZoom, scope.object.zoom / dollyScale));
+                    scope.object.updateProjectionMatrix();
+                    zoomChanged = true;
+                } else {
+                    console.warn('WARNING: OrbitControls.js encountered an unknown camera type - dolly/zoom disabled.');
+                    scope.enableZoom = false;
+                }
+            }
+
+            function handleMouseDownRotate(event) {
+                rotateStart.set(event.clientX, event.clientY);
+            }
+
+            function handleMouseDownDolly(event) {
+                dollyStart.set(event.clientX, event.clientY);
+            }
+
+            function handleMouseDownPan(event) {
+                panStart.set(event.clientX, event.clientY);
+            }
+
+            function handleMouseMoveRotate(event) {
+                rotateEnd.set(event.clientX, event.clientY);
+                rotateDelta.subVectors(rotateEnd, rotateStart).multiplyScalar(scope.rotateSpeed);
+                var element = scope.domElement;
+                rotateLeft(2 * Math.PI * rotateDelta.x / element.clientHeight);
+                rotateUp(2 * Math.PI * rotateDelta.y / element.clientHeight);
+                rotateStart.copy(rotateEnd);
+                scope.update();
+            }
+
+            function handleMouseMoveDolly(event) {
+                dollyEnd.set(event.clientX, event.clientY);
+                dollyDelta.subVectors(dollyEnd, dollyStart);
+                if (dollyDelta.y > 0) {
+                    dollyOut(getZoomScale());
+                } else if (dollyDelta.y < 0) {
+                    dollyIn(getZoomScale());
+                }
+                dollyStart.copy(dollyEnd);
+                scope.update();
+            }
+
+            function handleMouseMovePan(event) {
+                panEnd.set(event.clientX, event.clientY);
+                panDelta.subVectors(panEnd, panStart).multiplyScalar(scope.panSpeed);
+                pan(panDelta.x, panDelta.y);
+                panStart.copy(panEnd);
+                scope.update();
+            }
+
+            function handleMouseWheel(event) {
+                if (event.deltaY < 0) {
+                    dollyIn(getZoomScale());
+                } else if (event.deltaY > 0) {
+                    dollyOut(getZoomScale());
+                }
+                scope.update();
+            }
+
+            function onMouseDown(event) {
+                if (scope.enabled === false) return;
+                event.preventDefault();
+                switch (event.button) {
+                    case 0:
+                        if (event.ctrlKey || event.metaKey || event.shiftKey) {
+                            if (scope.enablePan === false) return;
+                            handleMouseDownPan(event);
+                            state = STATE.PAN;
+                        } else {
+                            if (scope.enableRotate === false) return;
+                            handleMouseDownRotate(event);
+                            state = STATE.ROTATE;
+                        }
+                        break;
+                    case 1:
+                        if (scope.enableZoom === false) return;
+                        handleMouseDownDolly(event);
+                        state = STATE.DOLLY;
+                        break;
+                    case 2:
+                        if (scope.enablePan === false) return;
+                        handleMouseDownPan(event);
+                        state = STATE.PAN;
+                        break;
+                }
+                if (state !== STATE.NONE) {
+                    document.addEventListener('mousemove', onMouseMove, false);
+                    document.addEventListener('mouseup', onMouseUp, false);
+                    scope.dispatchEvent(startEvent);
+                }
+            }
+
+            function onMouseMove(event) {
+                if (scope.enabled === false) return;
+                event.preventDefault();
+                switch (state) {
+                    case STATE.ROTATE:
+                        if (scope.enableRotate === false) return;
+                        handleMouseMoveRotate(event);
+                        break;
+                    case STATE.DOLLY:
+                        if (scope.enableZoom === false) return;
+                        handleMouseMoveDolly(event);
+                        break;
+                    case STATE.PAN:
+                        if (scope.enablePan === false) return;
+                        handleMouseMovePan(event);
+                        break;
+                }
+            }
+
+            function onMouseUp(event) {
+                if (scope.enabled === false) return;
+                document.removeEventListener('mousemove', onMouseMove, false);
+                document.removeEventListener('mouseup', onMouseUp, false);
+                scope.dispatchEvent(endEvent);
+                state = STATE.NONE;
+            }
+
+            function onMouseWheel(event) {
+                if (scope.enabled === false || scope.enableZoom === false || (state !== STATE.NONE && state !== STATE.ROTATE)) return;
+                event.preventDefault();
+                event.stopPropagation();
+                scope.dispatchEvent(startEvent);
+                handleMouseWheel(event);
+                scope.dispatchEvent(endEvent);
+            }
+
+            function onContextMenu(event) {
+                if (scope.enabled === false) return;
+                event.preventDefault();
+            }
+
+            scope.domElement.addEventListener('contextmenu', onContextMenu, false);
+            scope.domElement.addEventListener('mousedown', onMouseDown, false);
+            scope.domElement.addEventListener('wheel', onMouseWheel, false);
+
+            this.update = function () {
+                var offset = new THREE.Vector3();
+                var quat = new THREE.Quaternion().setFromUnitVectors(object.up, new THREE.Vector3(0, 1, 0));
+                var quatInverse = quat.clone().inverse();
+                var lastPosition = new THREE.Vector3();
+                var lastQuaternion = new THREE.Quaternion();
+
+                return function update() {
+                    var position = scope.object.position;
+                    offset.copy(position).sub(scope.target);
+                    offset.applyQuaternion(quat);
+                    spherical.setFromVector3(offset);
+                    if (scope.autoRotate && state === STATE.NONE) {
+                        rotateLeft(getAutoRotationAngle());
+                    }
+                    if (scope.enableDamping) {
+                        spherical.theta += sphericalDelta.theta * scope.dampingFactor;
+                        spherical.phi += sphericalDelta.phi * scope.dampingFactor;
+                    } else {
+                        spherical.theta += sphericalDelta.theta;
+                        spherical.phi += sphericalDelta.phi;
+                    }
+                    spherical.theta = Math.max(scope.minAzimuthAngle, Math.min(scope.maxAzimuthAngle, spherical.theta));
+                    spherical.phi = Math.max(scope.minPolarAngle, Math.min(scope.maxPolarAngle, spherical.phi));
+                    spherical.makeSafe();
+                    spherical.radius *= scale;
+                    spherical.radius = Math.max(scope.minDistance, Math.min(scope.maxDistance, spherical.radius));
+                    if (scope.enableDamping === true) {
+                        scope.target.addScaledVector(panOffset, scope.dampingFactor);
+                    } else {
+                        scope.target.add(panOffset);
+                    }
+                    offset.setFromSpherical(spherical);
+                    offset.applyQuaternion(quatInverse);
+                    position.copy(scope.target).add(offset);
+                    scope.object.lookAt(scope.target);
+                    if (scope.enableDamping === true) {
+                        sphericalDelta.theta *= (1 - scope.dampingFactor);
+                        sphericalDelta.phi *= (1 - scope.dampingFactor);
+                        panOffset.multiplyScalar(1 - scope.dampingFactor);
+                    } else {
+                        sphericalDelta.set(0, 0, 0);
+                        panOffset.set(0, 0, 0);
+                    }
+                    scale = 1;
+                    if (zoomChanged || lastPosition.distanceToSquared(scope.object.position) > EPS || 8 * (1 - lastQuaternion.dot(scope.object.quaternion)) > EPS) {
+                        scope.dispatchEvent(changeEvent);
+                        lastPosition.copy(scope.object.position);
+                        lastQuaternion.copy(scope.object.quaternion);
+                        zoomChanged = false;
+                        return true;
+                    }
+                    return false;
+                };
+            }();
+
+            this.dispose = function () {
+                scope.domElement.removeEventListener('contextmenu', onContextMenu, false);
+                scope.domElement.removeEventListener('mousedown', onMouseDown, false);
+                scope.domElement.removeEventListener('wheel', onMouseWheel, false);
+                document.removeEventListener('mousemove', onMouseMove, false);
+                document.removeEventListener('mouseup', onMouseUp, false);
+            };
+        };
+
+        THREE.OrbitControls.prototype = Object.create(THREE.EventDispatcher.prototype);
+        THREE.OrbitControls.prototype.constructor = THREE.OrbitControls;
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+        
+        body {
+            font-family: 'Share Tech Mono', monospace;
+            overflow: hidden;
+            background: #000;
+        }
+        
+        .glass-panel {
+            background: rgba(10, 15, 30, 0.75);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(0, 255, 255, 0.15);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        }
+        
+        .tech-border {
+            position: relative;
+        }
+        
+        .tech-border::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #00ffff, transparent);
+        }
+        
+        .glow-text {
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+        }
+        
+        .gear-btn {
+            transition: all 0.3s ease;
+        }
+        
+        .gear-btn:hover {
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.3);
+        }
+        
+        .gear-btn.active {
+            background: rgba(0, 255, 255, 0.2);
+            border-color: #00ffff;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.4);
+        }
+        
+        input[type="range"] {
+            -webkit-appearance: none;
+            background: transparent;
+        }
+        
+        input[type="range"]::-webkit-slider-track {
+            height: 4px;
+            background: rgba(0, 255, 255, 0.2);
+            border-radius: 2px;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #00ffff;
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+            margin-top: -6px;
+            cursor: pointer;
+        }
+        
+        .data-value {
+            color: #00ffff;
+            font-weight: bold;
+        }
+        
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 6px;
+        }
+        
+        .status-disengaged {
+            background: #ff4444;
+            box-shadow: 0 0 8px #ff4444;
+        }
+        
+        .status-engaging {
+            background: #ffaa00;
+            box-shadow: 0 0 8px #ffaa00;
+            animation: pulse 0.5s infinite alternate;
+        }
+        
+        .status-engaged {
+            background: #00ff88;
+            box-shadow: 0 0 8px #00ff88;
+        }
+        
+        @keyframes pulse {
+            from { opacity: 0.5; }
+            to { opacity: 1; }
+        }
+        
+        .hud-line {
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(0, 255, 255, 0.3), transparent);
+        }
+    </style>
+</head>
+<body class="bg-black text-white">
+
+    <!-- 3D Canvas -->
+    <div id="canvas-container" class="fixed inset-0"></div>
+
+    <!-- UI Control Panel -->
+    <div class="fixed top-4 right-4 w-80 glass-panel rounded-lg p-5 z-10 tech-border">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-cyan-400 text-lg font-bold glow-text tracking-wider">TRANSMISSION CONTROL</h2>
+            <div class="text-xs text-gray-500">v2.0</div>
+        </div>
+        
+        <!-- Gear Selection -->
+        <div class="mb-5">
+            <label class="text-xs text-gray-400 uppercase tracking-widest mb-2 block">Gear Selection</label>
+            <div class="grid grid-cols-5 gap-2">
+                <button id="btn-N" class="gear-btn active px-3 py-2 rounded border border-gray-600 text-sm font-bold" onclick="setGear('N')">N</button>
+                <button id="btn-1" class="gear-btn px-3 py-2 rounded border border-gray-600 text-sm font-bold" onclick="setGear('1')">1</button>
+                <button id="btn-2" class="gear-btn px-3 py-2 rounded border border-gray-600 text-sm font-bold" onclick="setGear('2')">2</button>
+                <button id="btn-3" class="gear-btn px-3 py-2 rounded border border-gray-600 text-sm font-bold" onclick="setGear('3')">3</button>
+                <button id="btn-R" class="gear-btn px-3 py-2 rounded border border-gray-600 text-sm font-bold text-red-400" onclick="setGear('R')">R</button>
+            </div>
+        </div>
+        
+        <!-- RPM Control -->
+        <div class="mb-5">
+            <div class="flex justify-between mb-1">
+                <label class="text-xs text-gray-400 uppercase tracking-widest">Engine RPM</label>
+                <span id="rpm-display" class="text-xs text-cyan-400">1000 RPM</span>
+            </div>
+            <input type="range" id="rpm-slider" min="0" max="6000" value="1000" step="100" class="w-full" oninput="updateRPM(this.value)">
+            <div class="flex justify-between mt-1 text-xs text-gray-600">
+                <span>0</span>
+                <span>3000</span>
+                <span>6000</span>
+            </div>
+        </div>
+        
+        <div class="hud-line mb-4"></div>
+        
+        <!-- Real-time Data HUD -->
+        <div class="space-y-3">
+            <div class="flex justify-between items-center">
+                <span class="text-xs text-gray-400 uppercase">Gear Ratio</span>
+                <span id="ratio-display" class="data-value text-sm">--</span>
+            </div>
+            <div class="flex justify-between items-center">
+                <span class="text-xs text-gray-400 uppercase">Clutch Status</span>
+                <div class="flex items-center">
+                    <span id="clutch-indicator" class="status-indicator status-disengaged"></span>
+                    <span id="clutch-display" class="data-value text-sm">Disengaged</span>
+                </div>
+            </div>
+            <div class="flex justify-between items-center">
+                <span class="text-xs text-gray-400 uppercase">Input RPM</span>
+                <span id="input-rpm-display" class="data-value text-sm">1000</span>
+            </div>
+            <div class="flex justify-between items-center">
+                <span class="text-xs text-gray-400 uppercase">Output RPM</span>
+                <span id="output-rpm-display" class="data-value text-sm">0</span>
+            </div>
+        </div>
+        
+        <div class="hud-line mt-4 mb-3"></div>
+        
+        <!-- Status Message -->
+        <div id="status-message" class="text-xs text-center text-gray-500 py-1">
+            System Ready - Select a gear
+        </div>
+    </div>
+
+    <!-- Info Panel -->
+    <div class="fixed bottom-4 left-4 glass-panel rounded-lg p-4 z-10 max-w-xs">
+        <div class="text-cyan-400 text-sm font-bold mb-2 glow-text">3D TRANSMISSION VIEW</div>
+        <div class="text-xs text-gray-400 space-y-1">
+            <div class="flex items-center gap-2">
+                <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                <span>Input Shaft (Engine)</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <div class="w-3 h-3 rounded-full bg-cyan-400"></div>
+                <span>Output Shaft (Wheels)</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <div class="w-3 h-3 rounded-full bg-yellow-400"></div>
+                <span>Gear Set</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <div class="w-3 h-3 rounded-full bg-purple-400"></div>
+                <span>Synchronizer</span>
+            </div>
+        </div>
+        <div class="mt-3 text-xs text-gray-500">
+            Drag to rotate • Scroll to zoom • Right-click to pan
+        </div>
+    </div>
+
+    <script>
+        // ==================== SCENE SETUP ====================
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x050508);
+        scene.fog = new THREE.FogExp2(0x050508, 0.02);
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(12, 8, 12);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        container.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.target.set(0, 0, 0);
+
+        // ==================== LIGHTING ====================
+        const ambientLight = new THREE.AmbientLight(0x1a1a2e, 0.6);
+        scene.add(ambientLight);
+
+        const mainLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        mainLight.position.set(10, 15, 10);
+        mainLight.castShadow = true;
+        mainLight.shadow.mapSize.width = 2048;
+        mainLight.shadow.mapSize.height = 2048;
+        scene.add(mainLight);
+
+        const pointLight1 = new THREE.PointLight(0x00ffff, 0.4, 30);
+        pointLight1.position.set(-5, 5, -5);
+        scene.add(pointLight1);
+
+        const pointLight2 = new THREE.PointLight(0xff0044, 0.3, 30);
+        pointLight2.position.set(5, -3, 5);
+        scene.add(pointLight2);
+
+        const spotLight = new THREE.SpotLight(0x00aaff, 0.6);
+        spotLight.position.set(0, 15, 0);
+        spotLight.angle = Math.PI / 4;
+        spotLight.penumbra = 0.5;
+        spotLight.castShadow = true;
+        scene.add(spotLight);
+
+        // ==================== GRID & ENVIRONMENT ====================
+        const gridHelper = new THREE.GridHelper(40, 40, 0x00ffff, 0x0a2a3a);
+        gridHelper.position.y = -4;
+        gridHelper.material.opacity = 0.15;
+        gridHelper.material.transparent = true;
+        scene.add(gridHelper);
+
+        // ==================== MATERIALS ====================
+        const shaftInputMat = new THREE.MeshStandardMaterial({ 
+            color: 0xff3333, 
+            metalness: 0.8, 
+            roughness: 0.2,
+            emissive: 0x330000,
+            emissiveIntensity: 0.2
+        });
+
+        const shaftOutputMat = new THREE.MeshStandardMaterial({ 
+            color: 0x00dddd, 
+            metalness: 0.8, 
+            roughness: 0.2,
+            emissive: 0x003333,
+            emissiveIntensity: 0.2
+        });
+
+        const gearMat = new THREE.MeshStandardMaterial({ 
+            color: 0xffcc00, 
+            metalness: 0.9, 
+            roughness: 0.15
+        });
+
+        const gearMatDark = new THREE.MeshStandardMaterial({ 
+            color: 0xcc9900, 
+            metalness: 0.9, 
+            roughness: 0.15
+        });
+
+        const syncMat = new THREE.MeshStandardMaterial({ 
+            color: 0xaa44ff, 
+            metalness: 0.7, 
+            roughness: 0.3,
+            emissive: 0x220044,
+            emissiveIntensity: 0.3
+        });
+
+        const clutchMat = new THREE.MeshStandardMaterial({ 
+            color: 0x888888, 
+            metalness: 0.6, 
+            roughness: 0.4,
+            transparent: true,
+            opacity: 0.7
+        });
+
+        const wireframeMat = new THREE.MeshBasicMaterial({ 
+            color: 0x00ffff, 
+            wireframe: true, 
+            transparent: true, 
+            opacity: 0.05 
+        });
+
+        // ==================== HELPER FUNCTIONS ====================
+        function createGear(radius, teeth, thickness, material, isInternal = false) {
+            const group = new THREE.Group();
+            
+            // Gear body
+            const bodyGeometry = new THREE.CylinderGeometry(radius, radius, thickness, teeth * 2);
+            const body = new THREE.Mesh(bodyGeometry, material);
+            body.rotation.z = Math.PI / 2;
+            body.castShadow = true;
+            group.add(body);
+            
+            // Wireframe overlay
+            const wireBody = new THREE.Mesh(bodyGeometry, wireframeMat);
+            wireBody.rotation.z = Math.PI / 2;
+            group.add(wireBody);
+            
+            // Teeth
+            const toothHeight = radius * 0.15;
+            const toothWidth = (2 * Math.PI * radius) / teeth * 0.4;
+            const toothGeometry = new THREE.BoxGeometry(thickness * 0.9, toothHeight, toothWidth);
+            
+            for (let i = 0; i < teeth; i++) {
+                const angle = (i / teeth) * Math.PI * 2;
+                const tooth = new THREE.Mesh(toothGeometry, material);
+                const r = radius + toothHeight / 2;
+                tooth.position.set(0, Math.cos(angle) * r, Math.sin(angle) * r);
+                tooth.rotation.x = -angle;
+                tooth.castShadow = true;
+                group.add(tooth);
+            }
+            
+            return group;
+        }
+
+        function createShaft(length, radius, material) {
+            const group = new THREE.Group();
+            
+            const shaftGeometry = new THREE.CylinderGeometry(radius, radius, length, 32);
+            const shaft = new THREE.Mesh(shaftGeometry, material);
+            shaft.rotation.z = Math.PI / 2;
+            shaft.castShadow = true;
+            group.add(shaft);
+            
+            // Wireframe
+            const wireShaft = new THREE.Mesh(shaftGeometry, wireframeMat);
+            wireShaft.rotation.z = Math.PI / 2;
+            group.add(wireShaft);
+            
+            // End caps
+            const capGeometry = new THREE.SphereGeometry(radius, 16, 16);
+            const cap1 = new THREE.Mesh(capGeometry, material);
+            cap1.position.x = -length / 2;
+            group.add(cap1);
+            const cap2 = new THREE.Mesh(capGeometry, material);
+            cap2.position.x = length / 2;
+            group.add(cap2);
+            
+            return group;
+        }
+
+        // ==================== TRANSMISSION ASSEMBLY ====================
+        const transmissionGroup = new THREE.Group();
+        scene.add(transmissionGroup);
+
+        // Input shaft group (rotates with engine)
+        const inputShaftGroup = new THREE.Group();
+        transmissionGroup.add(inputShaftGroup);
+
+        // Output shaft group
+        const outputShaftGroup = new THREE.Group();
+        transmissionGroup.add(outputShaftGroup);
+
+        // Gear positions along X axis
+        const GEAR_POS_1 = -2.5;
+        const GEAR_POS_2 = 0;
+        const GEAR_POS_3 = 2.5;
+        const REVERSE_POS = -4.5;
+
+        // ----- INPUT SHAFT -----
+        const inputShaft = createShaft(10, 0.4, shaftInputMat);
+        inputShaftGroup.add(inputShaft);
+
+        // Input gears (fixed to input shaft)
+        // Gear 1 (small - high ratio)
+        const inputGear1 = createGear(1.0, 16, 0.8, gearMat);
+        inputGear1.position.x = GEAR_POS_1;
+        inputShaftGroup.add(inputGear1);
+
+        // Gear 2 (medium)
+        const inputGear2 = createGear(1.5, 20, 0.8, gearMat);
+        inputGear2.position.x = GEAR_POS_2;
+        inputShaftGroup.add(inputGear2);
+
+        // Gear 3 (large - low ratio)
+        const inputGear3 = createGear(2.0, 24, 0.8, gearMat);
+        inputGear3.position.x = GEAR_POS_3;
+        inputShaftGroup.add(inputGear3);
+
+        // Reverse gear on input shaft
+        const inputGearR = createGear(1.2, 18, 0.8, gearMat);
+        inputGearR.position.x = REVERSE_POS - 1.5;
+        inputShaftGroup.add(inputGearR);
+
+        // Clutch disc (on input shaft, moves to engage)
+        const clutchDisc = createGear(1.3, 20, 0.3, clutchMat);
+        clutchDisc.position.x = -1.5;
+        inputShaftGroup.add(clutchDisc);
+
+        // ----- OUTPUT SHAFT -----
+        const outputShaft = createShaft(10, 0.4, shaftOutputMat);
+        outputShaftGroup.add(outputShaft);
+
+        // Output gears (freewheeling unless engaged by synchronizer)
+        // Gear 1 (large - meshes with small input gear)
+        const outputGear1 = createGear(3.0, 36, 0.8, gearMatDark);
+        outputGear1.position.x = GEAR_POS_1;
+        outputShaftGroup.add(outputGear1);
+
+        // Gear 2
+        const outputGear2 = createGear(3.0, 36, 0.8, gearMatDark);
+        outputGear2.position.x = GEAR_POS_2;
+        outputShaftGroup.add(outputGear2);
+
+        // Gear 3 (small - meshes with large input gear)
+        const outputGear3 = createGear(2.0, 24, 0.8, gearMatDark);
+        outputGear3.position.x = GEAR_POS_3;
+        outputShaftGroup.add(outputGear3);
+
+        // Reverse gear on output shaft
+        const outputGearR = createGear(2.5, 30, 0.8, gearMatDark);
+        outputGearR.position.x = REVERSE_POS + 1.5;
+        outputShaftGroup.add(outputGearR);
+
+        // Synchronizers (move to engage gears)
+        // Sync 1 (between gear 1 and 2)
+        const sync1 = createGear(1.0, 16, 0.6, syncMat);
+        sync1.position.x = -1.25;
+        outputShaftGroup.add(sync1);
+
+        // Sync 2 (between gear 2 and 3)
+        const sync2 = createGear(1.0, 16, 0.6, syncMat);
+        sync2.position.x = 1.25;
+        outputShaftGroup.add(sync2);
+
+        // Reverse idler gear
+        const idlerGear = createGear(1.8, 28, 0.8, new THREE.MeshStandardMaterial({ 
+            color: 0xff6600, 
+            metalness: 0.8, 
+            roughness: 0.2 
+        }));
+        idlerGear.position.set(REVERSE_POS, 0, 0);
+        transmissionGroup.add(idlerGear);
+
+        // Bearing supports
+        const bearingMat = new THREE.MeshStandardMaterial({ color: 0x444444, metalness: 0.9, roughness: 0.1 });
+        
+        function createBearing(x, y) {
+            const bearing = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 0.5, 32), bearingMat);
+            bearing.rotation.z = Math.PI / 2;
+            bearing.position.set(x, y, 0);
+            return bearing;
+        }
+
+        for (let x of [-5, -2.5, 0, 2.5, 5]) {
+            transmissionGroup.add(createBearing(x, 0.8));
+            transmissionGroup.add(createBearing(x, -0.8));
+        }
+
+        // Housing (transparent shell)
+        const housingGeometry = new THREE.BoxGeometry(14, 5, 4);
+        const housingMat = new THREE.MeshStandardMaterial({ 
+            color: 0x111122, 
+            transparent: true, 
+            opacity: 0.1,
+            wireframe: true
+        });
+        const housing = new THREE.Mesh(housingGeometry, housingMat);
+        housing.position.y = 0;
+        scene.add(housing);
+
+        // ==================== STATE VARIABLES ====================
+        let currentGear = 'N';
+        let targetGear = 'N';
+        let engineRPM = 1000;
+        let inputRotationSpeed = 0;
+        let outputRotationSpeed = 0;
+        let clutchEngagement = 0; // 0 to 1
+        let isShifting = false;
+        let shiftProgress = 0;
+
+        const gearRatios = {
+            'N': 0,
+            '1': 3.0,
+            '2': 2.0,
+            '3': 1.0,
+            'R': -3.0
+        };
+
+        const gearPositions = {
+            'N': { sync1: -1.25, sync2: 1.25, clutch: -1.5 },
+            '1': { sync1: GEAR_POS_1, sync2: 1.25, clutch: -1.5 },
+            '2': { sync1: -1.25, sync2: GEAR_POS_2, clutch: -1.5 },
+            '3': { sync1: -1.25, sync2: GEAR_POS_3, clutch: -1.5 },
+            'R': { sync1: -1.25, sync2: 1.25, clutch: REVERSE_POS + 1.5 }
+        };
+
+        // ==================== UI FUNCTIONS ====================
+        function updateRPM(value) {
+            engineRPM = parseInt(value);
+            document.getElementById('rpm-display').textContent = engineRPM + ' RPM';
+        }
+
+        function setGear(gear) {
+            if (isShifting || gear === currentGear) return;
+            
+            targetGear = gear;
+            isShifting = true;
+            shiftProgress = 0;
+            
+            // Update UI buttons
+            document.querySelectorAll('.gear-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById('btn-' + gear).classList.add('active');
+            
+            document.getElementById('status-message').textContent = 'Shifting to ' + gear + '...';
+            updateClutchStatus('engaging');
+        }
+
+        function updateClutchStatus(status) {
+            const indicator = document.getElementById('clutch-indicator');
+            const display = document.getElementById('clutch-display');
+            
+            indicator.className = 'status-indicator status-' + status;
+            
+            if (status === 'disengaged') {
+                display.textContent = 'Disengaged';
+                display.style.color = '#ff4444';
+            } else if (status === 'engaging') {
+                display.textContent = 'Engaging...';
+                display.style.color = '#ffaa00';
+            } else {
+                display.textContent = 'Engaged';
+                display.style.color = '#00ff88';
+            }
+        }
+
+        function updateHUD() {
+            const ratio = gearRatios[currentGear];
+            document.getElementById('ratio-display').textContent = ratio === 0 ? '--' : ratio.toFixed(1) + ':1';
+            document.getElementById('input-rpm-display').textContent = Math.round(engineRPM);
+            
+            let outputRPM = 0;
+            if (currentGear !== 'N' && clutchEngagement > 0.9) {
+                outputRPM = Math.abs(Math.round(engineRPM / Math.abs(ratio)));
+            }
+            document.getElementById('output-rpm-display').textContent = outputRPM;
+        }
+
+        // ==================== ANIMATION ====================
+        function animateShift(delta) {
+            if (!isShifting) return;
+            
+            shiftProgress += delta * 1.5; // Shift speed
+            
+            if (shiftProgress >= 1) {
+                shiftProgress = 1;
+                currentGear = targetGear;
+                isShifting = false;
+                clutchEngagement = 1;
+                updateClutchStatus('engaged');
+                document.getElementById('status-message').textContent = 'Gear ' + currentGear + ' engaged';
+            } else {
+                // Disengage clutch first, then engage new gear
+                if (shiftProgress < 0.3) {
+                    clutchEngagement = 1 - (shiftProgress / 0.3);
+                } else if (shiftProgress < 0.7) {
+                    clutchEngagement = 0;
+                    // Move synchronizers
+                    const t = (shiftProgress - 0.3) / 0.4;
+                    const currentPos = gearPositions[currentGear] || gearPositions['N'];
+                    const targetPos = gearPositions[targetGear];
+                    
+                    sync1.position.x = currentPos.sync1 + (targetPos.sync1 - currentPos.sync1) * t;
+                    sync2.position.x = currentPos.sync2 + (targetPos.sync2 - currentPos.sync2) * t;
+                    clutchDisc.position.x = currentPos.clutch + (targetPos.clutch - currentPos.clutch) * t;
+                } else {
+                    // Engage clutch
+                    clutchEngagement = (shiftProgress - 0.7) / 0.3;
+                }
+            }
+        }
+
+        let time = 0;
+
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            const delta = 0.016;
+            time += delta;
+            
+            // Update shift animation
+            animateShift(delta);
+            
+            // Calculate rotation speeds
+            inputRotationSpeed = (engineRPM / 60) * 2 * Math.PI * delta;
+            
+            if (currentGear === 'N' || clutchEngagement < 0.5) {
+                outputRotationSpeed = 0;
+            } else {
+                const ratio = gearRatios[currentGear];
+                const effectiveRatio = ratio * clutchEngagement;
+                outputRotationSpeed = inputRotationSpeed / effectiveRatio;
+                if (ratio < 0) outputRotationSpeed = -outputRotationSpeed;
+            }
+            
+            // Rotate input shaft and its gears
+            inputShaftGroup.rotation.x += inputRotationSpeed;
+            
+            // Rotate output shaft
+            if (Math.abs(outputRotationSpeed) > 0.001) {
+                outputShaftGroup.rotation.x += outputRotationSpeed;
+            }
+            
+            // Rotate freewheeling output gears (they spin with input when not engaged)
+            // When engaged, they rotate with output shaft
+            // When not engaged, they rotate based on meshing with input gears
+            
+            // Output gear 1 meshes with input gear 1
+            const gear1Ratio = 1.0 / 3.0; // input radius / output radius
+            if (currentGear !== '1' || clutchEngagement < 0.9) {
+                outputGear1.rotation.x = inputShaftGroup.rotation.x * gear1Ratio;
+            }
+            
+            // Output gear 2 meshes with input gear 2
+            const gear2Ratio = 1.5 / 3.0;
+            if (currentGear !== '2' || clutchEngagement < 0.9) {
+                outputGear2.rotation.x = inputShaftGroup.rotation.x * gear2Ratio;
+            }
+            
+            // Output gear 3 meshes with input gear 3
+            const gear3Ratio = 2.0 / 2.0;
+            if (currentGear !== '3' || clutchEngagement < 0.9) {
+                outputGear3.rotation.x = inputShaftGroup.rotation.x * gear3Ratio;
+            }
+            
+            // Reverse idler
+            if (currentGear !== 'R' || clutchEngagement < 0.9) {
+                idlerGear.rotation.x = -inputShaftGroup.rotation.x * (1.2 / 1.8);
+            }
+            
+            // Output reverse gear
+            if (currentGear !== 'R' || clutchEngagement < 0.9) {
+                outputGearR.rotation.x = inputShaftGroup.rotation.x * (1.2 / 2.5);
+            }
+            
+            // Animate clutch disc opacity
+            clutchMat.opacity = 0.3 + clutchEngagement * 0.5;
+            
+            // Pulse effect on engaged synchronizer
+            const pulse = 0.3 + Math.sin(time * 4) * 0.2;
+            if (currentGear === '1' && clutchEngagement > 0.5) {
+                syncMat.emissiveIntensity = pulse;
+            } else if (currentGear === '2' && clutchEngagement > 0.5) {
+                syncMat.emissiveIntensity = pulse;
+            } else if (currentGear === '3' && clutchEngagement > 0.5) {
+                syncMat.emissiveIntensity = pulse;
+            } else if (currentGear === 'R' && clutchEngagement > 0.5) {
+                syncMat.emissiveIntensity = pulse;
+            } else {
+                syncMat.emissiveIntensity = 0.3;
+            }
+            
+            // Idle animation when engine is running but in neutral
+            if (currentGear === 'N' && engineRPM > 0) {
+                // Subtle vibration
+                inputShaftGroup.position.y = Math.sin(time * 20) * 0.005;
+            } else {
+                inputShaftGroup.position.y = 0;
+            }
+            
+            // Update HUD
+            updateHUD();
+            
+            // Update TWEEN
+            TWEEN.update();
+            
+            // Update controls
+            controls.update();
+            
+            // Render
+            renderer.render(scene, camera);
+        }
+
+        // ==================== HANDLE RESIZE ====================
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // ==================== START ====================
+        animate();
+    </script>
+</body>
+</html>

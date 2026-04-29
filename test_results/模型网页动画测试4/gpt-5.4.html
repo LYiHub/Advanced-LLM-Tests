@@ -1,0 +1,1381 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>深澜智能｜液态玻璃大模型科技</title>
+  <meta name="description" content="深澜智能——面向企业级场景的大模型基础设施与智能应用平台，提供多模态推理、行业智能体、模型安全治理与私有化部署能力。" />
+  <style>
+    :root{
+      --bg:#05070a;
+      --bg-2:#0a0f16;
+      --bg-3:#09121b;
+      --text:#f5f7fb;
+      --muted:rgba(235,242,255,.68);
+      --line:rgba(255,255,255,.12);
+      --line-strong:rgba(255,255,255,.18);
+      --glass:rgba(255,255,255,.08);
+      --glass-2:rgba(255,255,255,.045);
+      --shadow:0 20px 80px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.16);
+      --blue-deep:#0a2034;
+      --blue-ocean:#123a5e;
+      --blue-ink:#18344a;
+      --cyan-soft:#8ed9ff;
+      --teal-soft:#9de9d4;
+      --gold-soft:#d6c1a3;
+      --radius-xl:28px;
+      --radius-lg:22px;
+      --radius-md:18px;
+      --max:1240px;
+      --mouse-x:50vw;
+      --mouse-y:50vh;
+      --scroll:0;
+    }
+
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    html{scroll-behavior:smooth}
+    body{
+      margin:0;
+      color:var(--text);
+      background:
+        radial-gradient(1200px 700px at 50% -10%, rgba(19,41,68,.36), transparent 60%),
+        radial-gradient(900px 600px at 100% 20%, rgba(10,31,52,.22), transparent 60%),
+        linear-gradient(180deg, #05070a 0%, #06090d 22%, #071018 100%);
+      font-family: Inter, "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui, -apple-system, Segoe UI, sans-serif;
+      overflow-x:hidden;
+      letter-spacing:.01em;
+    }
+
+    body::before{
+      content:"";
+      position:fixed;
+      inset:0;
+      pointer-events:none;
+      background:
+        radial-gradient(420px 420px at var(--mouse-x) var(--mouse-y), rgba(160,225,255,.05), transparent 52%),
+        radial-gradient(700px 450px at calc(var(--mouse-x) * .95) calc(var(--mouse-y) * 1.02), rgba(126,186,255,.03), transparent 55%);
+      mix-blend-mode:screen;
+      z-index:3;
+    }
+
+    body::after{
+      content:"";
+      position:fixed;
+      inset:0;
+      pointer-events:none;
+      background:
+        linear-gradient(rgba(255,255,255,.02), rgba(255,255,255,.01)),
+        repeating-linear-gradient(180deg, rgba(255,255,255,.018) 0 1px, transparent 1px 3px);
+      opacity:.09;
+      z-index:2;
+    }
+
+    a{color:inherit;text-decoration:none}
+    img{max-width:100%;display:block}
+    .container{width:min(var(--max), calc(100% - 40px)); margin:0 auto; position:relative; z-index:4}
+
+    .ambient{
+      position:fixed;
+      inset:0;
+      overflow:hidden;
+      pointer-events:none;
+      z-index:0;
+      filter:saturate(115%);
+    }
+
+    .blob{
+      position:absolute;
+      border-radius:54% 46% 61% 39% / 41% 53% 47% 59%;
+      background:
+        radial-gradient(circle at 35% 35%, rgba(145,215,255,.22), rgba(145,215,255,.08) 16%, transparent 30%),
+        radial-gradient(circle at 65% 25%, rgba(255,255,255,.08), transparent 22%),
+        radial-gradient(circle at 50% 60%, rgba(24,89,137,.56), rgba(10,31,52,.78) 45%, rgba(5,11,19,.0) 72%),
+        linear-gradient(135deg, rgba(12,36,58,.82), rgba(16,53,82,.62) 48%, rgba(8,20,32,.18));
+      box-shadow:
+        inset 0 0 50px rgba(173,229,255,.08),
+        inset 0 0 120px rgba(50,112,178,.18),
+        0 0 80px rgba(22,65,103,.18),
+        0 0 140px rgba(11,37,61,.16);
+      opacity:.92;
+      mix-blend-mode:screen;
+      filter: blur(1px) saturate(120%);
+      animation:
+        morph 16s ease-in-out infinite,
+        drift 24s ease-in-out infinite alternate;
+      transform-origin:center;
+      will-change:transform,border-radius,filter;
+    }
+
+    .blob::before,
+    .blob::after{
+      content:"";
+      position:absolute;
+      inset:8% 10%;
+      border-radius:inherit;
+      background:
+        radial-gradient(circle at 30% 30%, rgba(255,255,255,.12), transparent 18%),
+        radial-gradient(circle at 72% 36%, rgba(136,218,255,.12), transparent 20%),
+        linear-gradient(180deg, rgba(255,255,255,.08), transparent 38%);
+      mix-blend-mode:screen;
+      filter: blur(8px);
+      opacity:.8;
+    }
+
+    .blob.b1{width:36vw;height:36vw;left:-6vw;top:8vh;animation-duration:18s, 26s}
+    .blob.b2{width:32vw;height:28vw;right:-8vw;top:16vh;animation-duration:15s, 22s; animation-delay:-4s}
+    .blob.b3{width:30vw;height:34vw;left:16vw;bottom:-12vh;animation-duration:20s, 28s; animation-delay:-7s}
+    .blob.b4{width:22vw;height:22vw;right:20vw;bottom:12vh;animation-duration:13s, 20s; animation-delay:-3s; opacity:.72}
+
+    @keyframes morph{
+      0%,100%{border-radius:54% 46% 61% 39% / 41% 53% 47% 59%; transform:scale(1) rotate(0deg)}
+      25%{border-radius:41% 59% 47% 53% / 56% 39% 61% 44%; transform:scale(1.04) rotate(5deg)}
+      50%{border-radius:63% 37% 46% 54% / 46% 62% 38% 54%; transform:scale(.98) rotate(-4deg)}
+      75%{border-radius:48% 52% 58% 42% / 35% 49% 51% 65%; transform:scale(1.03) rotate(3deg)}
+    }
+
+    @keyframes drift{
+      0%{transform:translate3d(0,0,0)}
+      100%{transform:translate3d(3vw,-2vh,0)}
+    }
+
+    .mesh{
+      position:fixed; inset:-10%;
+      background:
+        radial-gradient(50vw 30vw at 20% 20%, rgba(14,45,70,.18), transparent 60%),
+        radial-gradient(36vw 26vw at 82% 24%, rgba(18,49,78,.18), transparent 62%),
+        radial-gradient(40vw 30vw at 55% 80%, rgba(10,38,62,.18), transparent 65%);
+      filter:blur(40px);
+      z-index:1;
+      pointer-events:none;
+      animation:meshMove 24s ease-in-out infinite alternate;
+    }
+    @keyframes meshMove{
+      from{transform:translate3d(0,0,0) scale(1)}
+      to{transform:translate3d(1.5vw,-1vh,0) scale(1.03)}
+    }
+
+    .glass{
+      position:relative;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.05)),
+        linear-gradient(135deg, rgba(255,255,255,.06), rgba(255,255,255,.02) 38%, rgba(255,255,255,.05));
+      border:1px solid rgba(255,255,255,.12);
+      border-radius:var(--radius-xl);
+      box-shadow:var(--shadow);
+      backdrop-filter: blur(22px) saturate(145%);
+      -webkit-backdrop-filter: blur(22px) saturate(145%);
+      overflow:hidden;
+      isolation:isolate;
+    }
+
+    .glass::before{
+      content:"";
+      position:absolute; inset:-1px;
+      border-radius:inherit;
+      background:
+        linear-gradient(135deg, rgba(255,255,255,.18), rgba(255,255,255,.02) 34%, rgba(255,255,255,.08) 60%, rgba(255,255,255,.03)),
+        radial-gradient(220px 120px at calc(var(--mx, .3) * 100%) calc(var(--my, .2) * 100%), rgba(255,255,255,.16), transparent 58%);
+      pointer-events:none;
+      mix-blend-mode:screen;
+      opacity:.9;
+      z-index:0;
+    }
+
+    .glass::after{
+      content:"";
+      position:absolute; inset:0;
+      border-radius:inherit;
+      pointer-events:none;
+      background:
+        radial-gradient(420px 260px at calc(var(--mx, .5) * 100%) calc(var(--my, .5) * 100%), rgba(158,225,255,.10), transparent 40%),
+        radial-gradient(220px 120px at 10% 0%, rgba(255,255,255,.08), transparent 45%),
+        linear-gradient(180deg, rgba(255,255,255,.05), transparent 25%, transparent 72%, rgba(255,255,255,.02));
+      opacity:.88;
+      z-index:0;
+    }
+
+    .glass > *{position:relative; z-index:1}
+
+    .liquid-edge{
+      position:relative;
+    }
+    .liquid-edge::before{
+      content:"";
+      position:absolute; inset:-22px;
+      border-radius:inherit;
+      background:
+        radial-gradient(380px 220px at calc(var(--mx, .5) * 100%) calc(var(--my, .5) * 100%), rgba(119,203,255,.09), transparent 38%),
+        conic-gradient(from 180deg at 50% 50%, rgba(255,255,255,.0), rgba(255,255,255,.08), rgba(255,255,255,.0) 40%, rgba(120,200,255,.05), rgba(255,255,255,.0) 72%);
+      filter: blur(18px);
+      opacity:.68;
+      pointer-events:none;
+      z-index:-1;
+    }
+
+    header.nav-wrap{
+      position:sticky; top:16px; z-index:10;
+      padding-top:16px;
+    }
+
+    .nav{
+      display:flex; align-items:center; justify-content:space-between;
+      padding:14px 18px;
+      border-radius:999px;
+      max-width:min(1100px, calc(100% - 16px));
+      margin:0 auto;
+    }
+
+    .brand{
+      display:flex; align-items:center; gap:12px;
+      font-weight:700; letter-spacing:.02em;
+    }
+
+    .brand-mark{
+      width:34px; height:34px; border-radius:50%;
+      position:relative;
+      background:
+        radial-gradient(circle at 30% 30%, rgba(255,255,255,.8), rgba(255,255,255,.18) 18%, transparent 28%),
+        radial-gradient(circle at 62% 64%, rgba(88,174,255,.58), rgba(23,63,101,.2) 55%, transparent 58%),
+        linear-gradient(145deg, rgba(255,255,255,.16), rgba(255,255,255,.03)),
+        linear-gradient(135deg, #0e2740, #133c63 56%, #08121d);
+      border:1px solid rgba(255,255,255,.16);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.28), 0 10px 20px rgba(0,0,0,.26);
+      overflow:hidden;
+    }
+    .brand-mark::after{
+      content:"";
+      position:absolute; inset:8px;
+      border-radius:50%;
+      border:1px solid rgba(255,255,255,.12);
+    }
+
+    .nav-links{
+      display:flex; gap:10px; align-items:center;
+    }
+    .nav-links a{
+      color:rgba(245,247,251,.82);
+      padding:10px 14px;
+      border-radius:999px;
+      font-size:14px;
+      transition:.35s ease;
+    }
+    .nav-links a:hover{
+      background:rgba(255,255,255,.08);
+      color:#fff;
+    }
+
+    .nav-cta{
+      display:flex; gap:10px; align-items:center;
+    }
+
+    .btn{
+      --btn-bg:rgba(255,255,255,.08);
+      display:inline-flex; align-items:center; justify-content:center;
+      gap:10px;
+      height:46px;
+      padding:0 18px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.14);
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.06)),
+        var(--btn-bg);
+      color:#fff;
+      font-weight:600;
+      letter-spacing:.01em;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.14), 0 14px 34px rgba(0,0,0,.25);
+      backdrop-filter: blur(18px) saturate(140%);
+      -webkit-backdrop-filter: blur(18px) saturate(140%);
+      transition: transform .35s ease, box-shadow .35s ease, background .35s ease, border-color .35s ease;
+      cursor:pointer;
+      white-space:nowrap;
+    }
+    .btn:hover{
+      transform:translateY(-2px);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.2), 0 18px 42px rgba(0,0,0,.32);
+      border-color:rgba(255,255,255,.2);
+    }
+    .btn.primary{
+      --btn-bg:linear-gradient(135deg, rgba(18,66,106,.55), rgba(34,104,166,.24));
+    }
+    .btn.secondary{
+      --btn-bg:rgba(255,255,255,.04);
+      color:rgba(255,255,255,.9);
+    }
+
+    .hero{
+      min-height:100vh;
+      display:flex; align-items:center;
+      padding:56px 0 80px;
+      position:relative;
+    }
+
+    .hero-grid{
+      display:grid;
+      grid-template-columns: 1.08fr .92fr;
+      gap:26px;
+      align-items:center;
+    }
+
+    .hero-copy{
+      padding:34px;
+    }
+
+    .eyebrow{
+      display:inline-flex; align-items:center; gap:10px;
+      padding:8px 14px;
+      border-radius:999px;
+      color:rgba(244,248,255,.82);
+      background:rgba(255,255,255,.045);
+      border:1px solid rgba(255,255,255,.12);
+      font-size:13px;
+      margin-bottom:18px;
+    }
+    .dot{
+      width:8px;height:8px;border-radius:50%;
+      background:linear-gradient(180deg, #b8ecff, #5ea2d2);
+      box-shadow:0 0 18px rgba(131,205,255,.75);
+    }
+
+    h1{
+      margin:0;
+      font-size: clamp(42px, 7vw, 88px);
+      line-height:.96;
+      letter-spacing:-.045em;
+      font-weight:800;
+      text-wrap:balance;
+    }
+
+    .gradient-text{
+      color:transparent;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.98), rgba(236,245,255,.82)),
+        linear-gradient(135deg, #d0eefc, #b8d8e8 45%, #e4d0b7 85%);
+      -webkit-background-clip:text;
+      background-clip:text;
+      filter:drop-shadow(0 6px 28px rgba(159,221,255,.08));
+    }
+
+    .hero p{
+      font-size:17px;
+      line-height:1.8;
+      color:var(--muted);
+      margin:20px 0 0;
+      max-width:58ch;
+    }
+
+    .hero-actions{
+      display:flex;
+      flex-wrap:wrap;
+      gap:12px;
+      margin-top:28px;
+    }
+
+    .hero-stats{
+      display:grid;
+      grid-template-columns:repeat(3,1fr);
+      gap:14px;
+      margin-top:26px;
+    }
+
+    .stat{
+      padding:18px 18px 16px;
+      border-radius:20px;
+      background:rgba(255,255,255,.045);
+      border:1px solid rgba(255,255,255,.10);
+    }
+    .stat strong{
+      display:block;
+      font-size:28px;
+      letter-spacing:-.03em;
+      margin-bottom:4px;
+    }
+    .stat span{
+      font-size:13px;
+      color:rgba(235,242,255,.68);
+    }
+
+    .hero-visual{
+      position:relative;
+      min-height:620px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+
+    .orbital{
+      position:relative;
+      width:min(620px, 100%);
+      aspect-ratio:1/1;
+      border-radius:50%;
+      display:grid;
+      place-items:center;
+    }
+
+    .halo{
+      position:absolute;
+      inset:8%;
+      border-radius:50%;
+      border:1px solid rgba(255,255,255,.08);
+      box-shadow:
+        inset 0 0 80px rgba(136,214,255,.05),
+        0 0 90px rgba(30,78,119,.08);
+      animation: spin 22s linear infinite;
+    }
+    .halo:nth-child(2){
+      inset:16%;
+      animation-direction:reverse;
+      animation-duration:28s;
+    }
+
+    @keyframes spin{
+      from{transform:rotate(0deg)}
+      to{transform:rotate(360deg)}
+    }
+
+    .core-panel{
+      width:78%;
+      border-radius:34px;
+      padding:22px;
+      transform-style:preserve-3d;
+      transform: perspective(1200px) rotateX(calc((var(--ry, 0) * -1) * 7deg)) rotateY(calc(var(--rx, 0) * 9deg));
+      transition: transform .2s linear;
+    }
+
+    .core-header{
+      display:flex; align-items:center; justify-content:space-between;
+      margin-bottom:14px;
+    }
+    .pill{
+      display:inline-flex; align-items:center; gap:8px;
+      padding:8px 12px;
+      border-radius:999px;
+      background:rgba(255,255,255,.06);
+      border:1px solid rgba(255,255,255,.10);
+      color:rgba(245,247,251,.88);
+      font-size:13px;
+    }
+
+    .screen{
+      min-height:350px;
+      border-radius:24px;
+      padding:22px;
+      background:
+        radial-gradient(240px 120px at 70% 22%, rgba(154,219,255,.08), transparent 46%),
+        linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.025));
+      border:1px solid rgba(255,255,255,.10);
+      overflow:hidden;
+    }
+
+    .screen-top{
+      display:flex; justify-content:space-between; align-items:center;
+      margin-bottom:18px;
+      color:rgba(255,255,255,.82);
+      font-size:14px;
+    }
+
+    .tiny-dots{display:flex; gap:8px}
+    .tiny-dots i{
+      width:8px;height:8px;border-radius:50%;
+      background:rgba(255,255,255,.22);
+      display:block;
+    }
+
+    .flow{
+      display:grid;
+      grid-template-columns:1.15fr .85fr;
+      gap:16px;
+      height:100%;
+    }
+
+    .code-panel,.metric-panel,.mini-card{
+      background:rgba(255,255,255,.045);
+      border:1px solid rgba(255,255,255,.10);
+      border-radius:18px;
+      position:relative;
+      overflow:hidden;
+    }
+
+    .code-panel{padding:18px}
+    .code-line{
+      height:10px;
+      margin:12px 0;
+      border-radius:999px;
+      background:
+        linear-gradient(90deg, rgba(160,228,255,.55), rgba(255,255,255,.08));
+      opacity:.9;
+      animation:pulse 3s ease-in-out infinite;
+    }
+    .code-line:nth-child(2){width:78%; animation-delay:.2s}
+    .code-line:nth-child(3){width:92%; animation-delay:.45s}
+    .code-line:nth-child(4){width:66%; animation-delay:.65s}
+    .code-line:nth-child(5){width:88%; animation-delay:.85s}
+    .code-line:nth-child(6){width:54%; animation-delay:1s}
+
+    @keyframes pulse{
+      0%,100%{opacity:.56; transform:translateX(0)}
+      50%{opacity:1; transform:translateX(4px)}
+    }
+
+    .side-stack{
+      display:grid;
+      gap:16px;
+      grid-template-rows:1fr 1fr;
+    }
+
+    .metric-panel{
+      padding:18px;
+      display:flex;
+      flex-direction:column;
+      justify-content:space-between;
+    }
+
+    .metric{
+      display:flex; align-items:end; justify-content:space-between;
+      gap:10px;
+    }
+    .metric h4{
+      margin:0;
+      font-size:14px;
+      color:rgba(245,247,251,.76);
+      font-weight:500;
+    }
+    .metric strong{
+      font-size:34px;
+      line-height:1;
+      letter-spacing:-.03em;
+    }
+
+    .bars{
+      display:flex; align-items:flex-end; gap:10px; height:86px;
+    }
+    .bars span{
+      flex:1;
+      border-radius:999px 999px 10px 10px;
+      background:
+        linear-gradient(180deg, rgba(177,227,255,.82), rgba(30,93,143,.26));
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.18);
+      animation:bars 4s ease-in-out infinite;
+    }
+    .bars span:nth-child(1){height:42%; animation-delay:.1s}
+    .bars span:nth-child(2){height:75%; animation-delay:.35s}
+    .bars span:nth-child(3){height:56%; animation-delay:.55s}
+    .bars span:nth-child(4){height:88%; animation-delay:.8s}
+    @keyframes bars{
+      0%,100%{transform:scaleY(.92); opacity:.82}
+      50%{transform:scaleY(1.03); opacity:1}
+    }
+
+    .mini-card{
+      padding:16px;
+      display:flex; flex-direction:column; justify-content:space-between;
+    }
+
+    .wave{
+      position:absolute;
+      inset:auto -10% -22% -10%;
+      height:68%;
+      background:
+        radial-gradient(120px 48px at 10% 50%, rgba(255,255,255,.14), transparent 54%),
+        linear-gradient(180deg, rgba(174,226,255,.20), rgba(21,75,121,.08));
+      filter:blur(6px);
+      border-radius:42% 58% 32% 68% / 40% 39% 61% 60%;
+      animation:wave 8s ease-in-out infinite alternate;
+      opacity:.8;
+    }
+    @keyframes wave{
+      from{transform:translateX(-4%) translateY(0) rotate(-2deg)}
+      to{transform:translateX(4%) translateY(-8px) rotate(2deg)}
+    }
+
+    .floating-chip{
+      position:absolute;
+      padding:12px 14px;
+      border-radius:18px;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.05)),
+        rgba(255,255,255,.04);
+      border:1px solid rgba(255,255,255,.14);
+      box-shadow:var(--shadow);
+      backdrop-filter: blur(18px) saturate(140%);
+      -webkit-backdrop-filter: blur(18px) saturate(140%);
+      font-size:13px;
+      color:rgba(245,247,251,.88);
+      z-index:2;
+      animation:floatChip 6s ease-in-out infinite;
+    }
+    .chip-1{left:0; top:18%; animation-delay:.2s}
+    .chip-2{right:0; top:12%; animation-delay:1.1s}
+    .chip-3{left:8%; bottom:10%; animation-delay:1.8s}
+    .chip-4{right:10%; bottom:4%; animation-delay:.8s}
+    @keyframes floatChip{
+      0%,100%{transform:translateY(0)}
+      50%{transform:translateY(-10px)}
+    }
+
+    section{
+      position:relative;
+      z-index:4;
+      padding:34px 0;
+    }
+
+    .section-head{
+      display:flex; align-items:end; justify-content:space-between; gap:20px;
+      margin-bottom:22px;
+    }
+    .section-head h2{
+      margin:0;
+      font-size:clamp(28px,4vw,54px);
+      line-height:1.02;
+      letter-spacing:-.04em;
+    }
+    .section-head p{
+      margin:0;
+      color:var(--muted);
+      max-width:54ch;
+      line-height:1.8;
+    }
+
+    .feature-grid{
+      display:grid;
+      grid-template-columns:repeat(3,1fr);
+      gap:18px;
+    }
+
+    .card{
+      padding:22px;
+      min-height:260px;
+      border-radius:26px;
+      transition: transform .4s ease, box-shadow .4s ease, border-color .4s ease;
+    }
+
+    .card:hover{
+      transform:translateY(-6px);
+      border-color:rgba(255,255,255,.18);
+      box-shadow:0 28px 80px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.18);
+    }
+
+    .icon{
+      width:52px; height:52px;
+      border-radius:16px;
+      display:grid; place-items:center;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.04)),
+        radial-gradient(circle at 30% 30%, rgba(169,225,255,.18), transparent 35%);
+      border:1px solid rgba(255,255,255,.12);
+      margin-bottom:18px;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.14);
+    }
+    .icon svg{width:24px;height:24px;stroke:#d8f2ff;opacity:.9}
+
+    .card h3{
+      margin:0 0 10px;
+      font-size:22px;
+      letter-spacing:-.02em;
+    }
+
+    .card p{
+      margin:0;
+      color:var(--muted);
+      line-height:1.8;
+      font-size:15px;
+    }
+
+    .card .meta{
+      margin-top:18px;
+      display:flex; flex-wrap:wrap; gap:8px;
+    }
+    .tag{
+      font-size:12px;
+      color:rgba(245,247,251,.8);
+      padding:8px 10px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.10);
+      background:rgba(255,255,255,.045);
+    }
+
+    .showcase{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:18px;
+      margin-top:18px;
+    }
+
+    .panel{
+      padding:24px;
+      min-height:340px;
+    }
+
+    .panel h3{
+      margin:0 0 10px;
+      font-size:28px;
+      letter-spacing:-.03em;
+    }
+    .panel p{
+      margin:0;
+      color:var(--muted);
+      line-height:1.8;
+    }
+
+    .timeline{
+      margin-top:24px;
+      display:grid; gap:14px;
+    }
+
+    .step{
+      display:grid;
+      grid-template-columns:auto 1fr auto;
+      align-items:center;
+      gap:14px;
+      padding:14px;
+      border-radius:18px;
+      background:rgba(255,255,255,.04);
+      border:1px solid rgba(255,255,255,.10);
+    }
+    .step .num{
+      width:34px;height:34px;border-radius:50%;
+      display:grid;place-items:center;
+      border:1px solid rgba(255,255,255,.14);
+      background:rgba(255,255,255,.06);
+      font-size:13px;
+      color:rgba(245,247,251,.86);
+    }
+    .step strong{font-size:15px}
+    .step span{font-size:13px; color:rgba(235,242,255,.62)}
+
+    .diagram{
+      height:100%;
+      min-height:280px;
+      border-radius:24px;
+      position:relative;
+      overflow:hidden;
+      background:
+        radial-gradient(220px 120px at 20% 20%, rgba(142,217,255,.08), transparent 60%),
+        radial-gradient(260px 120px at 80% 78%, rgba(154,236,212,.07), transparent 58%),
+        linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
+      border:1px solid rgba(255,255,255,.10);
+    }
+    .node{
+      position:absolute;
+      padding:14px 16px;
+      border-radius:18px;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.05)),
+        rgba(255,255,255,.035);
+      border:1px solid rgba(255,255,255,.12);
+      box-shadow:var(--shadow);
+      backdrop-filter: blur(16px) saturate(135%);
+      -webkit-backdrop-filter: blur(16px) saturate(135%);
+      font-size:14px;
+      color:rgba(245,247,251,.9);
+      animation: nodeFloat 5.5s ease-in-out infinite;
+    }
+    .node small{
+      display:block;
+      margin-top:6px;
+      color:rgba(235,242,255,.62);
+      font-size:12px;
+    }
+    .node.n1{left:8%; top:16%}
+    .node.n2{right:8%; top:12%; animation-delay:.7s}
+    .node.n3{left:14%; bottom:14%; animation-delay:1.2s}
+    .node.n4{right:14%; bottom:12%; animation-delay:1.8s}
+    .node.n5{left:50%; top:50%; transform:translate(-50%,-50%); animation-delay:.45s}
+    @keyframes nodeFloat{
+      0%,100%{translate:0 0}
+      50%{translate:0 -8px}
+    }
+
+    .link{
+      position:absolute;
+      height:1px;
+      background:linear-gradient(90deg, rgba(255,255,255,.05), rgba(162,223,255,.3), rgba(255,255,255,.05));
+      transform-origin:left center;
+      opacity:.82;
+      filter:drop-shadow(0 0 8px rgba(140,215,255,.25));
+    }
+
+    .banner{
+      margin-top:24px;
+      padding:30px;
+      display:grid;
+      grid-template-columns:1.15fr .85fr;
+      gap:20px;
+      align-items:center;
+    }
+    .banner h3{
+      margin:0;
+      font-size:clamp(28px,4vw,48px);
+      line-height:1.02;
+      letter-spacing:-.04em;
+    }
+    .banner p{
+      margin:12px 0 0;
+      color:var(--muted);
+      line-height:1.8;
+      max-width:58ch;
+    }
+
+    .trust{
+      display:grid;
+      grid-template-columns:repeat(4,1fr);
+      gap:14px;
+      margin-top:18px;
+    }
+    .trust-item{
+      padding:18px;
+      border-radius:20px;
+      background:rgba(255,255,255,.045);
+      border:1px solid rgba(255,255,255,.10);
+    }
+    .trust-item strong{
+      display:block;
+      font-size:15px;
+      margin-bottom:8px;
+    }
+    .trust-item p{
+      margin:0;
+      color:rgba(235,242,255,.68);
+      line-height:1.7;
+      font-size:14px;
+    }
+
+    footer{
+      padding:30px 0 50px;
+      position:relative;
+      z-index:4;
+    }
+
+    .footer{
+      padding:24px;
+      display:grid;
+      grid-template-columns:1.1fr .9fr;
+      gap:20px;
+      align-items:start;
+    }
+    .footer .left p{
+      color:var(--muted);
+      line-height:1.8;
+      max-width:58ch;
+      margin:10px 0 0;
+    }
+
+    .footer-links{
+      display:grid;
+      grid-template-columns:repeat(3,1fr);
+      gap:16px;
+    }
+    .footer-links h4{
+      margin:0 0 12px;
+      font-size:14px;
+      color:rgba(255,255,255,.92);
+    }
+    .footer-links a{
+      display:block;
+      color:rgba(235,242,255,.66);
+      font-size:14px;
+      margin:10px 0;
+    }
+    .footer-links a:hover{color:#fff}
+
+    .copyright{
+      margin-top:18px;
+      display:flex;
+      justify-content:space-between;
+      gap:18px;
+      flex-wrap:wrap;
+      color:rgba(235,242,255,.56);
+      font-size:13px;
+    }
+
+    .refract{
+      position:absolute;
+      inset:0;
+      pointer-events:none;
+      z-index:1;
+      opacity:.42;
+      background:
+        radial-gradient(220px 120px at calc(var(--mouse-x)) calc(var(--mouse-y)), rgba(255,255,255,.10), transparent 42%);
+      mix-blend-mode:screen;
+      filter:blur(18px);
+    }
+
+    @media (max-width: 1080px){
+      .hero-grid,.showcase,.banner,.footer{grid-template-columns:1fr}
+      .feature-grid{grid-template-columns:1fr 1fr}
+      .hero-visual{min-height:520px}
+      .core-panel{width:100%}
+      .footer-links{grid-template-columns:repeat(2,1fr)}
+    }
+
+    @media (max-width: 760px){
+      .nav-links{display:none}
+      .hero-copy{padding:24px}
+      .hero-stats,.trust,.feature-grid{grid-template-columns:1fr}
+      .flow{grid-template-columns:1fr}
+      .footer-links{grid-template-columns:1fr}
+      .hero{padding-top:34px}
+      .orbital{width:100%}
+      .floating-chip{display:none}
+      .banner{padding:24px}
+      .panel,.card{min-height:auto}
+    }
+  </style>
+</head>
+<body>
+  <div class="ambient">
+    <div class="blob b1"></div>
+    <div class="blob b2"></div>
+    <div class="blob b3"></div>
+    <div class="blob b4"></div>
+  </div>
+  <div class="mesh"></div>
+  <div class="refract"></div>
+
+  <header class="nav-wrap">
+    <div class="container">
+      <nav class="nav glass liquid-edge interactive">
+        <a href="#" class="brand">
+          <span class="brand-mark"></span>
+          <span>深澜智能</span>
+        </a>
+        <div class="nav-links">
+          <a href="#products">平台能力</a>
+          <a href="#solutions">行业方案</a>
+          <a href="#security">安全治理</a>
+          <a href="#contact">联系咨询</a>
+        </div>
+        <div class="nav-cta">
+          <a class="btn secondary interactive" href="#products">查看能力</a>
+          <a class="btn primary interactive" href="#contact">预约演示</a>
+        </div>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="container">
+        <div class="hero-grid">
+          <div class="hero-copy glass liquid-edge interactive">
+            <div class="eyebrow">
+              <span class="dot"></span>
+              企业级大模型基础设施与智能体平台
+            </div>
+            <h1>
+              让模型能力
+              <span class="gradient-text">真正进入业务核心</span>
+            </h1>
+            <p>
+              深澜智能面向复杂企业场景，提供多模态推理、行业知识增强、智能体编排、安全治理与私有化部署能力。
+              以稳定、可控、可审计的方式，让大模型从“可演示”走向“可落地、可扩展、可持续创造价值”。
+            </p>
+
+            <div class="hero-actions">
+              <a class="btn primary interactive" href="#contact">申请企业演示</a>
+              <a class="btn secondary interactive" href="#solutions">查看行业方案</a>
+            </div>
+
+            <div class="hero-stats">
+              <div class="stat interactive">
+                <strong>10B+</strong>
+                <span>企业级日均Token处理能力</span>
+              </div>
+              <div class="stat interactive">
+                <strong>99.95%</strong>
+                <span>关键推理服务可用性目标</span>
+              </div>
+              <div class="stat interactive">
+                <strong>40+</strong>
+                <span>覆盖金融、制造、零售与政企场景</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="hero-visual">
+            <div class="floating-chip chip-1 interactive">多模态理解 · 文本 / 图像 / 语音</div>
+            <div class="floating-chip chip-2 interactive">智能体编排 · 工具调用 · 工作流闭环</div>
+            <div class="floating-chip chip-3 interactive">安全治理 · 内容审查 · 权限隔离 · 审计追踪</div>
+            <div class="floating-chip chip-4 interactive">私有化部署 · 混合云 · 国产化适配</div>
+
+            <div class="orbital">
+              <div class="halo"></div>
+              <div class="halo"></div>
+
+              <div class="core-panel glass liquid-edge interactive" id="tilt-card">
+                <div class="core-header">
+                  <div class="pill"><span class="dot"></span> DeepLan Model Fabric</div>
+                  <div class="pill">实时推理总线</div>
+                </div>
+                <div class="screen">
+                  <div class="screen-top">
+                    <span>企业大模型控制台</span>
+                    <div class="tiny-dots"><i></i><i></i><i></i></div>
+                  </div>
+                  <div class="flow">
+                    <div class="code-panel interactive">
+                      <div class="pill" style="margin-bottom:14px;">模型路由 / 检索增强 / 工具执行</div>
+                      <div class="code-line" style="width:84%"></div>
+                      <div class="code-line"></div>
+                      <div class="code-line"></div>
+                      <div class="code-line"></div>
+                      <div class="code-line"></div>
+                      <div class="code-line"></div>
+                    </div>
+                    <div class="side-stack">
+                      <div class="metric-panel interactive">
+                        <div class="metric">
+                          <div>
+                            <h4>在线推理吞吐</h4>
+                            <strong>2.8x</strong>
+                          </div>
+                          <span class="tag">动态路由优化</span>
+                        </div>
+                        <div class="bars">
+                          <span></span><span></span><span></span><span></span>
+                        </div>
+                      </div>
+                      <div class="mini-card interactive">
+                        <div>
+                          <div class="pill">Agent Runtime</div>
+                          <h4 style="margin:14px 0 6px; font-size:18px;">任务状态稳定闭环</h4>
+                          <p style="margin:0; color:var(--muted); font-size:14px; line-height:1.8;">
+                            从意图识别到结果回写，全链路可观测、可追溯、可治理。
+                          </p>
+                        </div>
+                        <div class="wave"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="products">
+      <div class="container">
+        <div class="section-head">
+          <div>
+            <div class="eyebrow"><span class="dot"></span> 平台能力</div>
+            <h2>围绕企业级落地，重构大模型的生产方式</h2>
+          </div>
+          <p>
+            我们关注的不是单点模型性能，而是模型在真实组织中如何被安全接入、如何被准确调用、如何持续演进，以及如何稳定创造业务结果。
+          </p>
+        </div>
+
+        <div class="feature-grid">
+          <article class="card glass liquid-edge interactive">
+            <div class="icon">
+              <svg fill="none" viewBox="0 0 24 24" stroke-width="1.6">
+                <path d="M4 7h16M6 12h12M8 17h8" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <h3>多模态基础模型引擎</h3>
+            <p>
+              统一承载文本、图像、语音与结构化数据处理能力，支持不同模型按场景进行混合编排，在精度、速度与成本之间实现动态平衡。
+            </p>
+            <div class="meta">
+              <span class="tag">文本理解</span>
+              <span class="tag">视觉识别</span>
+              <span class="tag">语音交互</span>
+            </div>
+          </article>
+
+          <article class="card glass liquid-edge interactive">
+            <div class="icon">
+              <svg fill="none" viewBox="0 0 24 24" stroke-width="1.6">
+                <path d="M12 3v18M3 12h18M6 6l12 12M18 6 6 18" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <h3>行业知识增强与RAG</h3>
+            <p>
+              结合企业知识库、实时数据源与权限控制体系，为复杂问答、报告生成、运维辅助与知识作业提供可验证、可引用、低幻觉的输出。
+            </p>
+            <div class="meta">
+              <span class="tag">知识检索</span>
+              <span class="tag">权限继承</span>
+              <span class="tag">引用溯源</span>
+            </div>
+          </article>
+
+          <article class="card glass liquid-edge interactive">
+            <div class="icon">
+              <svg fill="none" viewBox="0 0 24 24" stroke-width="1.6">
+                <path d="M5 12a7 7 0 1 0 14 0A7 7 0 1 0 5 12Zm7-4v4l3 2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <h3>智能体编排与流程自动化</h3>
+            <p>
+              通过工具调用、任务分解、工作流执行与系统回写能力，让智能体从“会回答”升级为“能完成任务”，真正接入企业流程。
+            </p>
+            <div class="meta">
+              <span class="tag">工具调用</span>
+              <span class="tag">流程编排</span>
+              <span class="tag">结果回写</span>
+            </div>
+          </article>
+
+          <article class="card glass liquid-edge interactive">
+            <div class="icon">
+              <svg fill="none" viewBox="0 0 24 24" stroke-width="1.6">
+                <path d="M12 3l7 4v5c0 5-3.5 7.5-7 9-3.5-1.5-7-4-7-9V7l7-4Z" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <h3>模型安全治理中枢</h3>
+            <p>
+              提供内容风控、敏感数据识别、权限隔离、审计追踪与策略编排能力，在满足效率的同时，确保模型应用符合安全、合规与治理要求。
+            </p>
+            <div class="meta">
+              <span class="tag">审计日志</span>
+              <span class="tag">策略引擎</span>
+              <span class="tag">风险拦截</span>
+            </div>
+          </article>
+
+          <article class="card glass liquid-edge interactive">
+            <div class="icon">
+              <svg fill="none" viewBox="0 0 24 24" stroke-width="1.6">
+                <path d="M4 15c3-6 13-6 16 0M7 18c2-3 8-3 10 0M10 21c1-1 3-1 4 0M12 3v1" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <h3>高性能推理与弹性调度</h3>
+            <p>
+              针对峰值负载、低时延与多租户并发场景进行深度优化，支持模型路由、缓存复用、资源弹性伸缩与跨环境协同部署。
+            </p>
+            <div class="meta">
+              <span class="tag">低时延</span>
+              <span class="tag">弹性扩缩容</span>
+              <span class="tag">多租户</span>
+            </div>
+          </article>
+
+          <article class="card glass liquid-edge interactive">
+            <div class="icon">
+              <svg fill="none" viewBox="0 0 24 24" stroke-width="1.6">
+                <path d="M6 18V9m6 9V6m6 12v-4" stroke-linecap="round"/>
+                <path d="M4 21h16" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <h3>全链路评测与可观测性</h3>
+            <p>
+              对模型质量、提示词版本、工具调用结果与业务指标进行统一观测，用可量化的方式驱动模型持续优化，而非依赖经验判断。
+            </p>
+            <div class="meta">
+              <span class="tag">质量评估</span>
+              <span class="tag">版本回溯</span>
+              <span class="tag">运营分析</span>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="solutions">
+      <div class="container">
+        <div class="showcase">
+          <div class="panel glass liquid-edge interactive">
+            <div class="eyebrow"><span class="dot"></span> 行业方案</div>
+            <h3>让大模型在高价值场景中稳定创造结果</h3>
+            <p>
+              从知识密集型工作到流程密集型业务，我们将模型能力与企业原有系统深度整合，在效率提升之外，更强调准确性、责任边界与可治理性。
+            </p>
+
+            <div class="timeline">
+              <div class="step interactive">
+                <div class="num">01</div>
+                <div>
+                  <strong>金融与政企知识助手</strong>
+                  <span>支持制度问答、文档解读、法规检索与材料生成</span>
+                </div>
+                <span class="tag">可审计</span>
+              </div>
+              <div class="step interactive">
+                <div class="num">02</div>
+                <div>
+                  <strong>制造与运维智能副驾</strong>
+                  <span>覆盖故障分析、工艺协同、维修建议与工单自动流转</span>
+                </div>
+                <span class="tag">低时延</span>
+              </div>
+              <div class="step interactive">
+                <div class="num">03</div>
+                <div>
+                  <strong>零售与服务场景智能体</strong>
+                  <span>实现客服质检、营销内容生成、商品知识问答与经营分析</span>
+                </div>
+                <span class="tag">多角色</span>
+              </div>
+              <div class="step interactive">
+                <div class="num">04</div>
+                <div>
+                  <strong>企业内部协同自动化</strong>
+                  <span>联动OA、CRM、ERP、工单与知识系统形成任务闭环</span>
+                </div>
+                <span class="tag">可集成</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel glass liquid-edge interactive">
+            <div class="eyebrow"><span class="dot"></span> 架构视图</div>
+            <h3>统一模型底座，贯通数据、工具与业务系统</h3>
+            <p>
+              通过标准化接入层、治理层与执行层，建立模型与真实业务之间的稳态连接，让每一次生成、检索与调用都处于可控范围之内。
+            </p>
+
+            <div class="diagram" id="diagram">
+              <div class="node n1 interactive">知识系统<small>文档 / 数据库 / 向量库</small></div>
+              <div class="node n2 interactive">业务系统<small>CRM / ERP / OA / 工单</small></div>
+              <div class="node n3 interactive">治理中心<small>权限 / 审计 / 风控策略</small></div>
+              <div class="node n4 interactive">执行引擎<small>工作流 / 工具链 / 回写动作</small></div>
+              <div class="node n5 interactive">深澜模型中枢<small>路由 / RAG / Agent / 评测</small></div>
+
+              <div class="link" style="left:26%;top:29%;width:24%;transform:rotate(18deg)"></div>
+              <div class="link" style="right:27%;top:29%;width:22%;transform:rotate(-18deg)"></div>
+              <div class="link" style="left:30%;bottom:27%;width:20%;transform:rotate(-17deg)"></div>
+              <div class="link" style="right:29%;bottom:27%;width:20%;transform:rotate(16deg)"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="security">
+      <div class="container">
+        <div class="banner glass liquid-edge interactive">
+          <div>
+            <div class="eyebrow"><span class="dot"></span> 企业级可信能力</div>
+            <h3>不止于“能用”，更重要的是“可信、稳定、可长期运营”</h3>
+            <p>
+              对于真正的大模型生产环境，性能只是基础。深澜智能从权限边界、数据隔离、输出治理、版本追踪到部署架构，
+              构建完整的企业级可信体系，帮助组织以更低风险、更高确定性的方式推进智能化升级。
+            </p>
+          </div>
+          <div>
+            <div class="trust">
+              <div class="trust-item interactive">
+                <strong>私有化与混合部署</strong>
+                <p>支持本地、专有云与混合云架构，兼顾数据安全与弹性能力。</p>
+              </div>
+              <div class="trust-item interactive">
+                <strong>细粒度权限继承</strong>
+                <p>模型访问遵循组织已有权限体系，避免越权检索与不当暴露。</p>
+              </div>
+              <div class="trust-item interactive">
+                <strong>全链路审计回溯</strong>
+                <p>记录提示、检索、调用与输出过程，便于复盘、问责与优化。</p>
+              </div>
+              <div class="trust-item interactive">
+                <strong>持续评测优化</strong>
+                <p>以真实业务指标驱动迭代，让模型效果具备长期可运营性。</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer id="contact">
+    <div class="container">
+      <div class="footer glass liquid-edge interactive">
+        <div class="left">
+          <a href="#" class="brand">
+            <span class="brand-mark"></span>
+            <span>深澜智能</span>
+          </a>
+          <p>
+            面向下一代企业智能系统，我们以高级模型能力、严谨工程体系与可落地的方法论，
+            帮助组织构建可持续演进的 AI 基础设施与智能应用。
+          </p>
+          <div class="hero-actions" style="margin-top:20px;">
+            <a class="btn primary interactive" href="mailto:hello@deep-lan.ai">hello@deep-lan.ai</a>
+            <a class="btn secondary interactive" href="tel:400-888-2036">400-888-2036</a>
+          </div>
+        </div>
+
+        <div class="footer-links">
+          <div>
+            <h4>平台</h4>
+            <a href="#products">多模态引擎</a>
+            <a href="#products">知识增强 RAG</a>
+            <a href="#products">智能体编排</a>
+            <a href="#security">安全治理</a>
+          </div>
+          <div>
+            <h4>行业</h4>
+            <a href="#solutions">金融政企</a>
+            <a href="#solutions">制造运维</a>
+            <a href="#solutions">零售服务</a>
+            <a href="#solutions">企业协同</a>
+          </div>
+          <div>
+            <h4>联系</h4>
+            <a href="#">预约产品演示</a>
+            <a href="#">合作与生态</a>
+            <a href="#">媒体与品牌</a>
+            <a href="#">加入我们</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="copyright">
+        <span>© 2026 深澜智能 DeepLan Intelligence. All rights reserved.</span>
+        <span>企业级大模型平台 · 智能体基础设施 · 可治理 AI 系统</span>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    const root = document.documentElement;
+    const interactiveEls = document.querySelectorAll('.interactive');
+    const tiltCard = document.getElementById('tilt-card');
+
+    function clamp(v, min, max){ return Math.max(min, Math.min(max, v)); }
+
+    window.addEventListener('pointermove', (e) => {
+      const x = e.clientX;
+      const y = e.clientY;
+      root.style.setProperty('--mouse-x', x + 'px');
+      root.style.setProperty('--mouse-y', y + 'px');
+
+      if (tiltCard) {
+        const rect = tiltCard.getBoundingClientRect();
+        const rx = ((x - rect.left) / rect.width) - .5;
+        const ry = ((y - rect.top) / rect.height) - .5;
+        tiltCard.style.setProperty('--rx', clamp(rx, -1, 1).toFixed(3));
+        tiltCard.style.setProperty('--ry', clamp(ry, -1, 1).toFixed(3));
+      }
+
+      interactiveEls.forEach(el => {
+        const r = el.getBoundingClientRect();
+        const mx = clamp((x - r.left) / r.width, 0, 1);
+        const my = clamp((y - r.top) / r.height, 0, 1);
+        el.style.setProperty('--mx', mx.toFixed(3));
+        el.style.setProperty('--my', my.toFixed(3));
+      });
+    }, {passive:true});
+
+    window.addEventListener('scroll', () => {
+      root.style.setProperty('--scroll', window.scrollY);
+    }, {passive:true});
+
+    const blobs = document.querySelectorAll('.blob');
+    window.addEventListener('pointermove', (e) => {
+      const cx = window.innerWidth / 2;
+      const cy = window.innerHeight / 2;
+      const dx = (e.clientX - cx) / cx;
+      const dy = (e.clientY - cy) / cy;
+      blobs.forEach((blob, i) => {
+        const factor = (i + 1) * 4;
+        blob.style.transform = `translate(${dx * factor}px, ${dy * factor}px)`;
+      });
+    }, {passive:true});
+  </script>
+</body>
+</html>

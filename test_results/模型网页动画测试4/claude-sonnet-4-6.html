@@ -1,0 +1,2210 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEXUS AI — 下一代大模型智能</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Syne:wght@400;600;700;800&display=swap');
+
+  *, *::before, *::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  :root {
+    --glass-bg: rgba(255, 255, 255, 0.04);
+    --glass-border: rgba(255, 255, 255, 0.10);
+    --glass-shine: rgba(255, 255, 255, 0.06);
+    --text-primary: rgba(255, 255, 255, 0.92);
+    --text-secondary: rgba(255, 255, 255, 0.52);
+    --text-muted: rgba(255, 255, 255, 0.28);
+    --accent-gold: #c9a96e;
+    --accent-warm: #e8c9a0;
+    --accent-green: #7ec8a0;
+    --deep-bg: #080a0f;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--deep-bg);
+    color: var(--text-primary);
+    overflow-x: hidden;
+    cursor: none;
+  }
+
+  /* Custom Cursor */
+  .cursor-dot {
+    position: fixed;
+    width: 8px;
+    height: 8px;
+    background: rgba(255,255,255,0.9);
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 10000;
+    transform: translate(-50%, -50%);
+    transition: transform 0.1s ease, width 0.3s ease, height 0.3s ease, background 0.3s ease;
+    mix-blend-mode: difference;
+  }
+
+  .cursor-ring {
+    position: fixed;
+    width: 40px;
+    height: 40px;
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 9999;
+    transform: translate(-50%, -50%);
+    transition: transform 0.15s ease, width 0.4s cubic-bezier(0.34,1.56,0.64,1), height 0.4s cubic-bezier(0.34,1.56,0.64,1), border-color 0.3s ease, background 0.3s ease;
+  }
+
+  .cursor-ring.hovering {
+    width: 64px;
+    height: 64px;
+    border-color: rgba(201, 169, 110, 0.6);
+    background: rgba(201, 169, 110, 0.05);
+  }
+
+  /* WebGL Canvas */
+  #bg-canvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+  }
+
+  /* Noise Overlay */
+  .noise-overlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 1;
+    pointer-events: none;
+    opacity: 0.025;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  }
+
+  /* =================== LAYOUT =================== */
+  .page-wrapper {
+    position: relative;
+    z-index: 2;
+  }
+
+  /* =================== NAV =================== */
+  nav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    padding: 20px 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: all 0.5s ease;
+  }
+
+  nav.scrolled {
+    padding: 14px 48px;
+    background: rgba(8, 10, 15, 0.6);
+    backdrop-filter: blur(24px) saturate(1.4);
+    -webkit-backdrop-filter: blur(24px) saturate(1.4);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+
+  .nav-logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-decoration: none;
+  }
+
+  .logo-mark {
+    width: 36px;
+    height: 36px;
+    position: relative;
+  }
+
+  .logo-mark svg {
+    width: 100%;
+    height: 100%;
+  }
+
+  .logo-text {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 20px;
+    letter-spacing: 0.12em;
+    color: var(--text-primary);
+    text-transform: uppercase;
+  }
+
+  .logo-text span {
+    color: var(--accent-gold);
+  }
+
+  .nav-links {
+    display: flex;
+    align-items: center;
+    gap: 36px;
+    list-style: none;
+  }
+
+  .nav-links a {
+    text-decoration: none;
+    color: var(--text-secondary);
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    transition: color 0.3s ease;
+    position: relative;
+  }
+
+  .nav-links a::after {
+    content: '';
+    position: absolute;
+    bottom: -4px;
+    left: 0;
+    width: 0;
+    height: 1px;
+    background: var(--accent-gold);
+    transition: width 0.3s ease;
+  }
+
+  .nav-links a:hover {
+    color: var(--text-primary);
+  }
+
+  .nav-links a:hover::after {
+    width: 100%;
+  }
+
+  .nav-cta {
+    padding: 10px 24px;
+    background: rgba(201, 169, 110, 0.12);
+    border: 1px solid rgba(201, 169, 110, 0.35);
+    border-radius: 100px;
+    color: var(--accent-warm) !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    letter-spacing: 0.06em;
+    text-decoration: none;
+    transition: all 0.3s ease !important;
+    backdrop-filter: blur(8px);
+  }
+
+  .nav-cta:hover {
+    background: rgba(201, 169, 110, 0.22) !important;
+    border-color: rgba(201, 169, 110, 0.6) !important;
+    color: #fff !important;
+    box-shadow: 0 0 24px rgba(201, 169, 110, 0.2);
+  }
+
+  .nav-cta::after {
+    display: none !important;
+  }
+
+  /* =================== HERO =================== */
+  .hero {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 120px 48px 80px;
+    position: relative;
+  }
+
+  .hero-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 18px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 100px;
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--accent-warm);
+    margin-bottom: 40px;
+    backdrop-filter: blur(12px);
+    animation: fadeInDown 1s ease 0.2s both;
+  }
+
+  .eyebrow-dot {
+    width: 6px;
+    height: 6px;
+    background: var(--accent-green);
+    border-radius: 50%;
+    box-shadow: 0 0 8px var(--accent-green);
+    animation: pulse-dot 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; box-shadow: 0 0 8px var(--accent-green); }
+    50% { opacity: 0.6; box-shadow: 0 0 16px var(--accent-green); }
+  }
+
+  .hero-title {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: clamp(52px, 8vw, 108px);
+    line-height: 0.95;
+    letter-spacing: -0.03em;
+    margin-bottom: 32px;
+    animation: fadeInUp 1s ease 0.4s both;
+    max-width: 1000px;
+  }
+
+  .hero-title .line {
+    display: block;
+    overflow: hidden;
+  }
+
+  .hero-title .word-highlight {
+    position: relative;
+    display: inline-block;
+  }
+
+  .hero-title .word-highlight::before {
+    content: '';
+    position: absolute;
+    bottom: 6px;
+    left: -2px;
+    right: -2px;
+    height: 3px;
+    background: linear-gradient(90deg, var(--accent-gold), var(--accent-warm));
+    border-radius: 2px;
+    opacity: 0.7;
+  }
+
+  .hero-title .gradient-text {
+    background: linear-gradient(135deg, #e8c9a0 0%, #c9a96e 40%, #f0d9b5 70%, #c9a96e 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    background-size: 200% 200%;
+    animation: shimmer 6s ease-in-out infinite;
+  }
+
+  @keyframes shimmer {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+  }
+
+  .hero-subtitle {
+    max-width: 560px;
+    font-size: 17px;
+    line-height: 1.75;
+    color: var(--text-secondary);
+    margin-bottom: 52px;
+    font-weight: 300;
+    animation: fadeInUp 1s ease 0.6s both;
+  }
+
+  .hero-actions {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    animation: fadeInUp 1s ease 0.8s both;
+  }
+
+  .btn-primary {
+    position: relative;
+    padding: 16px 40px;
+    background: linear-gradient(135deg, rgba(201, 169, 110, 0.9), rgba(201, 169, 110, 0.6));
+    border: 1px solid rgba(201, 169, 110, 0.5);
+    border-radius: 100px;
+    color: #0a0c10;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-decoration: none;
+    text-transform: uppercase;
+    cursor: none;
+    overflow: hidden;
+    transition: all 0.4s ease;
+    backdrop-filter: blur(8px);
+  }
+
+  .btn-primary::before {
+    content: '';
+    position: absolute;
+    top: 0; left: -100%;
+    width: 100%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent);
+    transition: left 0.5s ease;
+  }
+
+  .btn-primary:hover::before {
+    left: 100%;
+  }
+
+  .btn-primary:hover {
+    box-shadow: 0 8px 40px rgba(201, 169, 110, 0.35), 0 2px 12px rgba(201, 169, 110, 0.2);
+    transform: translateY(-2px);
+  }
+
+  .btn-secondary {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 16px 36px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 100px;
+    color: var(--text-secondary);
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    text-decoration: none;
+    cursor: none;
+    transition: all 0.4s ease;
+    backdrop-filter: blur(12px);
+  }
+
+  .btn-secondary:hover {
+    background: rgba(255,255,255,0.08);
+    border-color: rgba(255,255,255,0.2);
+    color: var(--text-primary);
+    transform: translateY(-2px);
+  }
+
+  .btn-secondary .arrow-icon {
+    width: 16px;
+    height: 16px;
+    transition: transform 0.3s ease;
+  }
+
+  .btn-secondary:hover .arrow-icon {
+    transform: translateX(4px);
+  }
+
+  .hero-scroll-hint {
+    position: absolute;
+    bottom: 40px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    opacity: 0.3;
+    animation: fadeIn 1s ease 1.5s both;
+  }
+
+  .scroll-line {
+    width: 1px;
+    height: 48px;
+    background: linear-gradient(to bottom, rgba(255,255,255,0.6), transparent);
+    animation: scrollPulse 2.5s ease-in-out infinite;
+  }
+
+  @keyframes scrollPulse {
+    0%, 100% { opacity: 0.3; transform: scaleY(1); }
+    50% { opacity: 0.7; transform: scaleY(1.1); }
+  }
+
+  .scroll-label {
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  /* Stats Bar */
+  .hero-stats {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin-top: 80px;
+    padding: 28px 48px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 20px;
+    backdrop-filter: blur(24px) saturate(1.2);
+    -webkit-backdrop-filter: blur(24px) saturate(1.2);
+    position: relative;
+    overflow: hidden;
+    animation: fadeInUp 1s ease 1s both;
+  }
+
+  .hero-stats::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+  }
+
+  .stat-item {
+    flex: 1;
+    text-align: center;
+    padding: 0 32px;
+    position: relative;
+  }
+
+  .stat-item + .stat-item::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 1px;
+    height: 40px;
+    background: rgba(255,255,255,0.08);
+  }
+
+  .stat-number {
+    font-family: 'Syne', sans-serif;
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+
+  .stat-number .unit {
+    color: var(--accent-gold);
+    font-size: 20px;
+  }
+
+  .stat-label {
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  /* =================== SECTION COMMON =================== */
+  section {
+    position: relative;
+    padding: 140px 48px;
+  }
+
+  .section-label {
+    display: inline-block;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--accent-gold);
+    margin-bottom: 20px;
+    opacity: 0.8;
+  }
+
+  .section-title {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: clamp(36px, 5vw, 64px);
+    line-height: 1.05;
+    letter-spacing: -0.03em;
+    margin-bottom: 20px;
+  }
+
+  .section-subtitle {
+    font-size: 16px;
+    line-height: 1.8;
+    color: var(--text-secondary);
+    max-width: 520px;
+    font-weight: 300;
+  }
+
+  /* =================== MODELS SECTION =================== */
+  .models-section {
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  .models-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: 72px;
+  }
+
+  .models-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+  }
+
+  .model-card {
+    position: relative;
+    padding: 40px;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 24px;
+    backdrop-filter: blur(32px) saturate(1.3);
+    -webkit-backdrop-filter: blur(32px) saturate(1.3);
+    overflow: hidden;
+    cursor: none;
+    transition: transform 0.5s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.5s ease, border-color 0.4s ease;
+    will-change: transform;
+  }
+
+  .model-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.15) 50%, transparent 100%);
+  }
+
+  .model-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 24px;
+    opacity: 0;
+    background: radial-gradient(circle at var(--mx, 50%) var(--my, 50%), rgba(255,255,255,0.05) 0%, transparent 70%);
+    transition: opacity 0.4s ease;
+    pointer-events: none;
+  }
+
+  .model-card:hover::after {
+    opacity: 1;
+  }
+
+  .model-card:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 24px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.12);
+    border-color: rgba(255,255,255,0.16);
+  }
+
+  .card-featured {
+    grid-row: span 2;
+    background: rgba(255,255,255,0.05);
+    border-color: rgba(201, 169, 110, 0.2);
+  }
+
+  .card-featured:hover {
+    border-color: rgba(201, 169, 110, 0.4) !important;
+    box-shadow: 0 24px 80px rgba(0,0,0,0.5), 0 0 40px rgba(201, 169, 110, 0.08) !important;
+  }
+
+  .card-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 28px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .card-icon svg {
+    width: 24px;
+    height: 24px;
+    z-index: 1;
+    position: relative;
+  }
+
+  .icon-bg-1 { background: rgba(201, 169, 110, 0.12); border: 1px solid rgba(201, 169, 110, 0.2); }
+  .icon-bg-2 { background: rgba(126, 200, 160, 0.12); border: 1px solid rgba(126, 200, 160, 0.2); }
+  .icon-bg-3 { background: rgba(160, 180, 220, 0.12); border: 1px solid rgba(160, 180, 220, 0.2); }
+  .icon-bg-4 { background: rgba(220, 160, 180, 0.12); border: 1px solid rgba(220, 160, 180, 0.2); }
+  .icon-bg-5 { background: rgba(180, 160, 220, 0.12); border: 1px solid rgba(180, 160, 220, 0.2); }
+
+  .card-tag {
+    display: inline-block;
+    padding: 4px 12px;
+    background: rgba(201, 169, 110, 0.1);
+    border: 1px solid rgba(201, 169, 110, 0.25);
+    border-radius: 100px;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent-gold);
+    margin-bottom: 16px;
+  }
+
+  .card-title {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 24px;
+    letter-spacing: -0.02em;
+    margin-bottom: 14px;
+    line-height: 1.2;
+  }
+
+  .card-featured .card-title {
+    font-size: 32px;
+  }
+
+  .card-desc {
+    font-size: 14px;
+    line-height: 1.8;
+    color: var(--text-secondary);
+    font-weight: 300;
+  }
+
+  .card-featured .card-desc {
+    font-size: 15px;
+  }
+
+  .card-metrics {
+    display: flex;
+    gap: 24px;
+    margin-top: 32px;
+    padding-top: 28px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+  }
+
+  .metric {
+    flex: 1;
+  }
+
+  .metric-value {
+    font-family: 'Syne', sans-serif;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: -0.02em;
+  }
+
+  .metric-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 0.06em;
+    margin-top: 3px;
+  }
+
+  .card-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 32px;
+    font-size: 13px;
+    color: var(--accent-warm);
+    text-decoration: none;
+    letter-spacing: 0.04em;
+    transition: gap 0.3s ease;
+    cursor: none;
+  }
+
+  .card-link:hover {
+    gap: 14px;
+  }
+
+  /* =================== CAPABILITIES SECTION =================== */
+  .capabilities-section {
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  .capabilities-inner {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 80px;
+    align-items: center;
+  }
+
+  .capabilities-visual {
+    position: relative;
+    height: 560px;
+  }
+
+  .cap-orb-container {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .cap-center-orb {
+    width: 200px;
+    height: 200px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, rgba(201, 169, 110, 0.3), rgba(140, 100, 60, 0.08) 60%, transparent);
+    border: 1px solid rgba(201, 169, 110, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    backdrop-filter: blur(16px);
+    box-shadow: 0 0 60px rgba(201, 169, 110, 0.08), inset 0 1px 0 rgba(255,255,255,0.1);
+    animation: orbFloat 6s ease-in-out infinite;
+  }
+
+  @keyframes orbFloat {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-12px); }
+  }
+
+  .cap-center-orb-inner {
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--accent-warm);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    text-align: center;
+    line-height: 1.4;
+  }
+
+  .cap-orbit {
+    position: absolute;
+    border-radius: 50%;
+    border: 1px dashed rgba(255,255,255,0.06);
+    animation: orbitRotate linear infinite;
+  }
+
+  .cap-orbit:nth-child(1) { width: 300px; height: 300px; animation-duration: 20s; }
+  .cap-orbit:nth-child(2) { width: 420px; height: 420px; animation-duration: 32s; animation-direction: reverse; }
+  .cap-orbit:nth-child(3) { width: 520px; height: 520px; animation-duration: 45s; }
+
+  @keyframes orbitRotate {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  .orbit-dot {
+    position: absolute;
+    top: -5px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--accent-gold);
+    box-shadow: 0 0 12px var(--accent-gold);
+  }
+
+  .orbit-dot-green {
+    background: var(--accent-green);
+    box-shadow: 0 0 12px var(--accent-green);
+  }
+
+  .orbit-dot-white {
+    background: rgba(255,255,255,0.6);
+    box-shadow: 0 0 12px rgba(255,255,255,0.3);
+    width: 6px;
+    height: 6px;
+    top: -3px;
+  }
+
+  .cap-floating-tag {
+    position: absolute;
+    padding: 10px 18px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 12px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    backdrop-filter: blur(16px);
+    white-space: nowrap;
+    letter-spacing: 0.04em;
+  }
+
+  .cap-floating-tag:nth-child(5)  { top: 10%;  left: 5%;   animation: tagFloat1 7s ease-in-out infinite; }
+  .cap-floating-tag:nth-child(6)  { top: 15%;  right: 8%;  animation: tagFloat2 8s ease-in-out infinite 1s; }
+  .cap-floating-tag:nth-child(7)  { bottom: 20%; left: 2%;  animation: tagFloat1 9s ease-in-out infinite 0.5s; }
+  .cap-floating-tag:nth-child(8)  { bottom: 15%; right: 5%; animation: tagFloat2 7.5s ease-in-out infinite 1.5s; }
+
+  @keyframes tagFloat1 {
+    0%, 100% { transform: translateY(0) translateX(0); }
+    33% { transform: translateY(-8px) translateX(4px); }
+    66% { transform: translateY(4px) translateX(-3px); }
+  }
+  @keyframes tagFloat2 {
+    0%, 100% { transform: translateY(0) translateX(0); }
+    33% { transform: translateY(6px) translateX(-4px); }
+    66% { transform: translateY(-5px) translateX(3px); }
+  }
+
+  .capabilities-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .cap-item {
+    padding: 24px 28px;
+    border-radius: 16px;
+    border: 1px solid transparent;
+    cursor: none;
+    transition: all 0.4s ease;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .cap-item::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: transparent;
+    border-radius: 0 2px 2px 0;
+    transition: background 0.3s ease;
+  }
+
+  .cap-item:hover {
+    background: rgba(255,255,255,0.03);
+    border-color: rgba(255,255,255,0.08);
+  }
+
+  .cap-item:hover::before {
+    background: var(--accent-gold);
+  }
+
+  .cap-item-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 8px;
+  }
+
+  .cap-item-num {
+    font-family: 'Syne', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--accent-gold);
+    opacity: 0.5;
+    letter-spacing: 0.1em;
+  }
+
+  .cap-item-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  .cap-item-desc {
+    font-size: 13px;
+    color: var(--text-muted);
+    line-height: 1.7;
+    padding-left: 34px;
+  }
+
+  /* =================== USE CASES =================== */
+  .usecases-section {
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  .usecases-header {
+    text-align: center;
+    margin-bottom: 72px;
+  }
+
+  .usecases-header .section-subtitle {
+    margin: 0 auto;
+    max-width: 480px;
+  }
+
+  .usecases-scroll {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+  }
+
+  .usecase-card {
+    position: relative;
+    border-radius: 20px;
+    overflow: hidden;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    padding: 32px 28px;
+    cursor: none;
+    transition: all 0.5s cubic-bezier(0.34,1.56,0.64,1);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+  }
+
+  .usecase-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent);
+  }
+
+  .usecase-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 32px 80px rgba(0,0,0,0.45);
+    border-color: rgba(255,255,255,0.15);
+  }
+
+  .usecase-num {
+    font-family: 'Syne', sans-serif;
+    font-size: 48px;
+    font-weight: 800;
+    color: rgba(255,255,255,0.04);
+    letter-spacing: -0.04em;
+    line-height: 1;
+    margin-bottom: 20px;
+    transition: color 0.3s ease;
+  }
+
+  .usecase-card:hover .usecase-num {
+    color: rgba(201, 169, 110, 0.08);
+  }
+
+  .usecase-icon {
+    width: 40px;
+    height: 40px;
+    margin-bottom: 20px;
+    opacity: 0.7;
+  }
+
+  .usecase-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 12px;
+    letter-spacing: -0.01em;
+  }
+
+  .usecase-desc {
+    font-size: 13px;
+    line-height: 1.75;
+    color: var(--text-muted);
+  }
+
+  .usecase-industries {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 24px;
+  }
+
+  .industry-tag {
+    padding: 4px 10px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 100px;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+  }
+
+  /* =================== TRUST SECTION =================== */
+  .trust-section {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding-top: 0;
+    padding-bottom: 80px;
+  }
+
+  .trust-inner {
+    padding: 56px 64px;
+    background: rgba(255,255,255,0.025);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 28px;
+    backdrop-filter: blur(24px);
+    overflow: hidden;
+    position: relative;
+  }
+
+  .trust-inner::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent);
+  }
+
+  .trust-header {
+    text-align: center;
+    margin-bottom: 48px;
+  }
+
+  .trust-label {
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 14px;
+  }
+
+  .trust-title {
+    font-size: 15px;
+    color: var(--text-secondary);
+    font-weight: 300;
+  }
+
+  .logos-track {
+    display: flex;
+    gap: 64px;
+    align-items: center;
+    animation: logoScroll 28s linear infinite;
+    white-space: nowrap;
+  }
+
+  .logos-wrapper {
+    overflow: hidden;
+    mask: linear-gradient(90deg, transparent, black 10%, black 90%, transparent);
+    -webkit-mask: linear-gradient(90deg, transparent, black 10%, black 90%, transparent);
+  }
+
+  .logos-inner {
+    display: flex;
+  }
+
+  @keyframes logoScroll {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+
+  .logo-item {
+    font-family: 'Syne', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.2);
+    transition: color 0.3s ease;
+    flex-shrink: 0;
+  }
+
+  /* =================== CTA SECTION =================== */
+  .cta-section {
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  .cta-inner {
+    text-align: center;
+    padding: 96px 64px;
+    background: rgba(255,255,255,0.025);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 32px;
+    position: relative;
+    overflow: hidden;
+    backdrop-filter: blur(32px);
+  }
+
+  .cta-inner::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent 0%, rgba(201, 169, 110, 0.3) 50%, transparent 100%);
+  }
+
+  .cta-glow {
+    position: absolute;
+    width: 600px;
+    height: 300px;
+    background: radial-gradient(ellipse, rgba(201, 169, 110, 0.06) 0%, transparent 70%);
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+  }
+
+  .cta-eyebrow {
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--accent-gold);
+    opacity: 0.7;
+    margin-bottom: 24px;
+  }
+
+  .cta-title {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(40px, 5vw, 72px);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1.05;
+    margin-bottom: 24px;
+  }
+
+  .cta-desc {
+    font-size: 16px;
+    color: var(--text-secondary);
+    max-width: 440px;
+    margin: 0 auto 48px;
+    font-weight: 300;
+    line-height: 1.8;
+  }
+
+  .cta-actions {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+  }
+
+  .cta-input-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 6px 6px 24px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 100px;
+    backdrop-filter: blur(12px);
+    transition: border-color 0.3s ease;
+  }
+
+  .cta-input-wrap:focus-within {
+    border-color: rgba(201, 169, 110, 0.4);
+  }
+
+  .cta-input {
+    background: none;
+    border: none;
+    outline: none;
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    color: var(--text-primary);
+    width: 240px;
+  }
+
+  .cta-input::placeholder {
+    color: var(--text-muted);
+  }
+
+  /* =================== FOOTER =================== */
+  footer {
+    padding: 80px 48px 48px;
+    border-top: 1px solid rgba(255,255,255,0.05);
+    position: relative;
+    z-index: 2;
+  }
+
+  .footer-inner {
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  .footer-top {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
+    gap: 48px;
+    margin-bottom: 72px;
+  }
+
+  .footer-brand .logo-text {
+    font-size: 18px;
+    margin-bottom: 16px;
+    display: block;
+  }
+
+  .footer-brand p {
+    font-size: 13px;
+    color: var(--text-muted);
+    line-height: 1.8;
+    max-width: 260px;
+    margin-bottom: 28px;
+  }
+
+  .footer-social {
+    display: flex;
+    gap: 12px;
+  }
+
+  .social-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: none;
+    transition: all 0.3s ease;
+    text-decoration: none;
+  }
+
+  .social-btn:hover {
+    background: rgba(255,255,255,0.08);
+    border-color: rgba(255,255,255,0.16);
+    transform: translateY(-2px);
+  }
+
+  .social-btn svg {
+    width: 16px;
+    height: 16px;
+    fill: rgba(255,255,255,0.4);
+  }
+
+  .footer-col h4 {
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.4);
+    margin-bottom: 20px;
+  }
+
+  .footer-col ul {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 11px;
+  }
+
+  .footer-col a {
+    text-decoration: none;
+    font-size: 13px;
+    color: var(--text-muted);
+    transition: color 0.3s ease;
+    cursor: none;
+  }
+
+  .footer-col a:hover {
+    color: var(--text-secondary);
+  }
+
+  .footer-bottom {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 32px;
+    border-top: 1px solid rgba(255,255,255,0.05);
+  }
+
+  .footer-copyright {
+    font-size: 12px;
+    color: var(--text-muted);
+    letter-spacing: 0.04em;
+  }
+
+  .footer-legal {
+    display: flex;
+    gap: 24px;
+  }
+
+  .footer-legal a {
+    font-size: 12px;
+    color: var(--text-muted);
+    text-decoration: none;
+    transition: color 0.3s ease;
+    cursor: none;
+  }
+
+  .footer-legal a:hover {
+    color: var(--text-secondary);
+  }
+
+  /* =================== ANIMATIONS =================== */
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(30px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes fadeInDown {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 0.3; }
+  }
+
+  /* Scroll reveal */
+  .reveal {
+    opacity: 0;
+    transform: translateY(40px);
+    transition: opacity 0.8s ease, transform 0.8s cubic-bezier(0.34,1.2,0.64,1);
+  }
+
+  .reveal.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .reveal-delay-1 { transition-delay: 0.1s; }
+  .reveal-delay-2 { transition-delay: 0.2s; }
+  .reveal-delay-3 { transition-delay: 0.3s; }
+  .reveal-delay-4 { transition-delay: 0.4s; }
+
+  /* =================== REFRACTION OVERLAY =================== */
+  .refraction-canvas {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    z-index: 1;
+    opacity: 0.6;
+  }
+</style>
+</head>
+<body>
+
+<!-- Custom Cursor -->
+<div class="cursor-dot" id="cursorDot"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+
+<!-- Noise overlay -->
+<div class="noise-overlay"></div>
+
+<!-- WebGL Background -->
+<canvas id="bg-canvas"></canvas>
+
+<!-- Refraction Canvas -->
+<canvas class="refraction-canvas" id="refraction-canvas"></canvas>
+
+<div class="page-wrapper">
+
+  <!-- =================== NAV =================== -->
+  <nav id="main-nav">
+    <a href="#" class="nav-logo">
+      <div class="logo-mark">
+        <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M18 2L32 10V26L18 34L4 26V10L18 2Z" stroke="rgba(201,169,110,0.6)" stroke-width="1" fill="rgba(201,169,110,0.05)"/>
+          <path d="M18 8L26 13V23L18 28L10 23V13L18 8Z" stroke="rgba(201,169,110,0.4)" stroke-width="1" fill="rgba(201,169,110,0.08)"/>
+          <circle cx="18" cy="18" r="4" fill="rgba(201,169,110,0.7)"/>
+        </svg>
+      </div>
+      <span class="logo-text">NEXUS<span> AI</span></span>
+    </a>
+    <ul class="nav-links">
+      <li><a href="#models">模型</a></li>
+      <li><a href="#capabilities">能力</a></li>
+      <li><a href="#usecases">应用场景</a></li>
+      <li><a href="#about">关于</a></li>
+      <li><a href="#" class="nav-cta">申请体验</a></li>
+    </ul>
+  </nav>
+
+  <!-- =================== HERO =================== -->
+  <section class="hero">
+    <div class="hero-eyebrow">
+      <span class="eyebrow-dot"></span>
+      NEXUS-ULTRA 3.0 现已全面开放
+    </div>
+    <h1 class="hero-title">
+      <span class="line">超越边界的</span>
+      <span class="line gradient-text">大模型智能</span>
+    </h1>
+    <p class="hero-subtitle">
+      NEXUS AI 以万亿参数量级的通用大模型为核心，
+      构建下一代 AI 基础设施，让智能真正融入每一个关键决策。
+    </p>
+    <div class="hero-actions">
+      <a href="#" class="btn-primary">立即开始构建</a>
+      <a href="#models" class="btn-secondary">
+        探索我们的模型
+        <svg class="arrow-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M5 12h14M12 5l7 7-7 7"/>
+        </svg>
+      </a>
+    </div>
+
+    <div class="hero-stats">
+      <div class="stat-item">
+        <div class="stat-number">12<span class="unit">T</span></div>
+        <div class="stat-label">训练参数量</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-number">98.7<span class="unit">%</span></div>
+        <div class="stat-label">基准测试准确率</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-number">200<span class="unit">K</span></div>
+        <div class="stat-label">上下文窗口 Token</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-number">50<span class="unit">+</span></div>
+        <div class="stat-label">主流语言支持</div>
+      </div>
+    </div>
+
+    <div class="hero-scroll-hint">
+      <div class="scroll-line"></div>
+      <span class="scroll-label">向下探索</span>
+    </div>
+  </section>
+
+  <!-- =================== MODELS SECTION =================== -->
+  <section id="models">
+    <div class="models-section">
+      <div class="models-header reveal">
+        <div>
+          <span class="section-label">核心产品</span>
+          <h2 class="section-title">前沿大模型<br>产品矩阵</h2>
+        </div>
+        <p class="section-subtitle">每一个模型都是重新定义边界的尝试，每一次推理都是对人类智识的延伸。</p>
+      </div>
+
+      <div class="models-grid">
+        <!-- Featured Card -->
+        <div class="model-card card-featured reveal" data-tilt>
+          <div class="card-icon icon-bg-1">
+            <svg viewBox="0 0 24 24" fill="none" stroke="rgba(201,169,110,0.9)" stroke-width="1.5">
+              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+            </svg>
+          </div>
+          <span class="card-tag">旗舰模型</span>
+          <h3 class="card-title">NEXUS-ULTRA</h3>
+          <p class="card-desc">我们最强大的通用大模型。具备卓越的逻辑推理、多模态理解与跨域知识整合能力，在复杂科学问题求解、长文档深度分析及创意生成方面均达到行业顶尖水准。</p>
+          <div class="card-metrics">
+            <div class="metric">
+              <div class="metric-value">12T</div>
+              <div class="metric-label">参数量</div>
+            </div>
+            <div class="metric">
+              <div class="metric-value">200K</div>
+              <div class="metric-label">上下文</div>
+            </div>
+            <div class="metric">
+              <div class="metric-value">46ms</div>
+              <div class="metric-label">首 Token 延迟</div>
+            </div>
+          </div>
+          <a href="#" class="card-link">
+            了解 NEXUS-ULTRA →
+          </a>
+        </div>
+
+        <!-- Card 2 -->
+        <div class="model-card reveal reveal-delay-1" data-tilt>
+          <div class="card-icon icon-bg-2">
+            <svg viewBox="0 0 24 24" fill="none" stroke="rgba(126,200,160,0.9)" stroke-width="1.5">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M12 6v6l4 2"/>
+            </svg>
+          </div>
+          <span class="card-tag" style="color:#7ec8a0;border-color:rgba(126,200,160,0.3);background:rgba(126,200,160,0.08)">轻量高效</span>
+          <h3 class="card-title">NEXUS-SWIFT</h3>
+          <p class="card-desc">极致优化的边缘推理模型，在资源受限环境中实现媲美大模型的语义理解能力，专为实时交互场景打造。</p>
+          <a href="#" class="card-link">了解更多 →</a>
+        </div>
+
+        <!-- Card 3 -->
+        <div class="model-card reveal reveal-delay-2" data-tilt>
+          <div class="card-icon icon-bg-3">
+            <svg viewBox="0 0 24 24" fill="none" stroke="rgba(160,180,220,0.9)" stroke-width="1.5">
+              <rect x="3" y="3" width="18" height="18" rx="2"/>
+              <path d="M9 9h6M9 12h6M9 15h4"/>
+            </svg>
+          </div>
+          <span class="card-tag" style="color:#a0b4dc;border-color:rgba(160,180,220,0.3);background:rgba(160,180,220,0.08)">代码专精</span>
+          <h3 class="card-title">NEXUS-CODE</h3>
+          <p class="card-desc">在 92 种编程语言上深度训练的代码智能模型，支持完整工程代码补全、缺陷检测与自动化测试生成。</p>
+          <a href="#" class="card-link">了解更多 →</a>
+        </div>
+
+        <!-- Card 4 -->
+        <div class="model-card reveal reveal-delay-3" data-tilt>
+          <div class="card-icon icon-bg-4">
+            <svg viewBox="0 0 24 24" fill="none" stroke="rgba(220,160,180,0.9)" stroke-width="1.5">
+              <path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16"/>
+              <path d="M14 14l1.586-1.586a2 2 0 012.828 0L20 14"/>
+              <rect x="2" y="4" width="20" height="16" rx="2"/>
+            </svg>
+          </div>
+          <span class="card-tag" style="color:#dca0b4;border-color:rgba(220,160,180,0.3);background:rgba(220,160,180,0.08)">多模态</span>
+          <h3 class="card-title">NEXUS-VISION</h3>
+          <p class="card-desc">图文音视频统一感知与生成模型，实现真正意义上的跨模态推理与内容创作，打通视觉与语言的认知鸿沟。</p>
+          <a href="#" class="card-link">了解更多 →</a>
+        </div>
+
+        <!-- Card 5 -->
+        <div class="model-card reveal reveal-delay-4" data-tilt>
+          <div class="card-icon icon-bg-5">
+            <svg viewBox="0 0 24 24" fill="none" stroke="rgba(180,160,220,0.9)" stroke-width="1.5">
+              <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/>
+              <path d="M2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/>
+            </svg>
+          </div>
+          <span class="card-tag" style="color:#b4a0dc;border-color:rgba(180,160,220,0.3);background:rgba(180,160,220,0.08)">私有部署</span>
+          <h3 class="card-title">NEXUS-PRIVATE</h3>
+          <p class="card-desc">企业级私有化部署方案，数据永不离境，支持完整定制微调，满足金融、医疗、政务等高安全场景。</p>
+          <a href="#" class="card-link">了解更多 →</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =================== CAPABILITIES SECTION =================== -->
+  <section id="capabilities">
+    <div class="capabilities-section">
+      <div class="capabilities-inner">
+        <!-- Visual -->
+        <div class="capabilities-visual reveal">
+          <div class="cap-orb-container">
+            <div class="cap-orbit">
+              <div class="orbit-dot"></div>
+            </div>
+            <div class="cap-orbit">
+              <div class="orbit-dot orbit-dot-green"></div>
+            </div>
+            <div class="cap-orbit">
+              <div class="orbit-dot orbit-dot-white"></div>
+            </div>
+            <div class="cap-center-orb">
+              <div class="cap-center-orb-inner">NEXUS<br>CORE</div>
+            </div>
+            <div class="cap-floating-tag">⚡ 实时推理</div>
+            <div class="cap-floating-tag">🔒 安全对齐</div>
+            <div class="cap-floating-tag">🌐 多语言</div>
+            <div class="cap-floating-tag">📊 可解释性</div>
+          </div>
+        </div>
+
+        <!-- Content -->
+        <div class="reveal reveal-delay-1">
+          <span class="section-label">核心能力</span>
+          <h2 class="section-title">构建于<br>坚实的技术底座</h2>
+          <p class="section-subtitle" style="margin-bottom: 40px;">从基础架构到上层应用，NEXUS AI 在每一个技术层面都追求极致，为企业级 AI 落地提供最可靠的基础。</p>
+
+          <ul class="capabilities-list">
+            <li class="cap-item">
+              <div class="cap-item-header">
+                <span class="cap-item-num">01</span>
+                <h3 class="cap-item-title">万亿参数稀疏混合专家架构</h3>
+              </div>
+              <p class="cap-item-desc">基于 Mixture-of-Experts 的创新架构，激活参数仅为总量的 12%，在大幅降低推理成本的同时保持旗舰性能。</p>
+            </li>
+            <li class="cap-item">
+              <div class="cap-item-header">
+                <span class="cap-item-num">02</span>
+                <h3 class="cap-item-title">宪法 AI 与价值对齐技术</h3>
+              </div>
+              <p class="cap-item-desc">专有 Constitutional AI 训练框架，从根源保证模型输出的可控性与安全性，通过最严苛的行业合规认证。</p>
+            </li>
+            <li class="cap-item">
+              <div class="cap-item-header">
+                <span class="cap-item-num">03</span>
+                <h3 class="cap-item-title">长程上下文记忆与检索增强</h3>
+              </div>
+              <p class="cap-item-desc">200K Token 原生上下文窗口，结合创新的记忆压缩机制，实现真正意义上的「无损」超长文档理解。</p>
+            </li>
+            <li class="cap-item">
+              <div class="cap-item-header">
+                <span class="cap-item-num">04</span>
+                <h3 class="cap-item-title">毫秒级全球低延迟推理网络</h3>
+              </div>
+              <p class="cap-item-desc">覆盖六大洲的边缘推理节点，结合动态路由算法，将 P99 推理延迟控制在 80ms 以内，确保极致的实时体验。</p>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =================== USE CASES =================== -->
+  <section id="usecases">
+    <div class="usecases-section">
+      <div class="usecases-header reveal">
+        <span class="section-label">应用场景</span>
+        <h2 class="section-title">无处不在的<br>智能赋能</h2>
+        <p class="section-subtitle">NEXUS AI 正在重塑各行业的核心业务流程，将大模型能力转化为真实的商业价值。</p>
+      </div>
+
+      <div class="usecases-scroll">
+        <div class="usecase-card reveal">
+          <div class="usecase-num">01</div>
+          <svg class="usecase-icon" viewBox="0 0 40 40" fill="none">
+            <path d="M8 20c0-6.627 5.373-12 12-12s12 5.373 12 12-5.373 12-12 12S8 26.627 8 20z" stroke="rgba(201,169,110,0.6)" stroke-width="1.5"/>
+            <path d="M20 14v6l4 2" stroke="rgba(201,169,110,0.6)" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          <h3 class="usecase-title">金融智能决策</h3>
+          <p class="usecase-desc">实时风控、量化策略生成、合规文档审查与客户洞察分析，让每一个金融决策都有 AI 护航。</p>
+          <div class="usecase-industries">
+            <span class="industry-tag">银行</span>
+            <span class="industry-tag">保险</span>
+            <span class="industry-tag">资管</span>
+          </div>
+        </div>
+
+        <div class="usecase-card reveal reveal-delay-1">
+          <div class="usecase-num">02</div>
+          <svg class="usecase-icon" viewBox="0 0 40 40" fill="none">
+            <rect x="8" y="8" width="24" height="24" rx="4" stroke="rgba(126,200,160,0.6)" stroke-width="1.5"/>
+            <path d="M15 20l4 4 8-8" stroke="rgba(126,200,160,0.6)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <h3 class="usecase-title">医疗健康辅助</h3>
+          <p class="usecase-desc">辅助诊断、药物研发加速、医学影像分析与患者随访管理，推动精准医疗的临床落地。</p>
+          <div class="usecase-industries">
+            <span class="industry-tag">医院</span>
+            <span class="industry-tag">制药</span>
+            <span class="industry-tag">基因组学</span>
+          </div>
+        </div>
+
+        <div class="usecase-card reveal reveal-delay-2">
+          <div class="usecase-num">03</div>
+          <svg class="usecase-icon" viewBox="0 0 40 40" fill="none">
+            <path d="M12 28l8-16 8 16" stroke="rgba(160,180,220,0.6)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M15 23h10" stroke="rgba(160,180,220,0.6)" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          <h3 class="usecase-title">法律智能研究</h3>
+          <p class="usecase-desc">海量法律文书语义检索、合同条款自动审查与风险标注、司法预测与判例推理，大幅提升法律工作效率。</p>
+          <div class="usecase-industries">
+            <span class="industry-tag">律所</span>
+            <span class="industry-tag">合规</span>
+            <span class="industry-tag">司法</span>
+          </div>
+        </div>
+
+        <div class="usecase-card reveal reveal-delay-3">
+          <div class="usecase-num">04</div>
+          <svg class="usecase-icon" viewBox="0 0 40 40" fill="none">
+            <circle cx="20" cy="16" r="6" stroke="rgba(220,160,180,0.6)" stroke-width="1.5"/>
+            <path d="M10 30c0-5.523 4.477-10 10-10s10 4.477 10 10" stroke="rgba(220,160,180,0.6)" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          <h3 class="usecase-title">智能客户服务</h3>
+          <p class="usecase-desc">全渠道 AI 客服、情感识别与意图理解、知识库自动构建，将客户满意度提升至全新高度。</p>
+          <div class="usecase-industries">
+            <span class="industry-tag">电商</span>
+            <span class="industry-tag">零售</span>
+            <span class="industry-tag">电信</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =================== TRUST =================== -->
+  <section class="trust-section">
+    <div class="trust-inner reveal">
+      <div class="trust-header">
+        <p class="trust-label">值得信赖的合作伙伴</p>
+        <p class="trust-title">全球 500+ 头部企业和机构正在使用 NEXUS AI</p>
+      </div>
+      <div class="logos-wrapper">
+        <div class="logos-inner">
+          <div class="logos-track">
+            <span class="logo-item">AURORA CAPITAL</span>
+            <span class="logo-item">MERIDIAN HEALTH</span>
+            <span class="logo-item">VERTEX SYSTEMS</span>
+            <span class="logo-item">SOVEREIGN BANK</span>
+            <span class="logo-item">ORBITAL TECH</span>
+            <span class="logo-item">ATLAS PHARMA</span>
+            <span class="logo-item">NEXGEN MEDIA</span>
+            <span class="logo-item">LUMINA GROUP</span>
+            <span class="logo-item">STERLING LAW</span>
+            <span class="logo-item">APEX LOGISTICS</span>
+          </div>
+          <div class="logos-track" aria-hidden="true">
+            <span class="logo-item">AURORA CAPITAL</span>
+            <span class="logo-item">MERIDIAN HEALTH</span>
+            <span class="logo-item">VERTEX SYSTEMS</span>
+            <span class="logo-item">SOVEREIGN BANK</span>
+            <span class="logo-item">ORBITAL TECH</span>
+            <span class="logo-item">ATLAS PHARMA</span>
+            <span class="logo-item">NEXGEN MEDIA</span>
+            <span class="logo-item">LUMINA GROUP</span>
+            <span class="logo-item">STERLING LAW</span>
+            <span class="logo-item">APEX LOGISTICS</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =================== CTA =================== -->
+  <section class="cta-section">
+    <div class="cta-inner reveal">
+      <div class="cta-glow"></div>
+      <p class="cta-eyebrow">准备好了吗</p>
+      <h2 class="cta-title">构建下一代<br>AI 应用</h2>
+      <p class="cta-desc">加入全球数千名开发者和企业，用 NEXUS AI 将你的创意变为可能。</p>
+      <div class="cta-actions">
+        <div class="cta-input-wrap">
+          <input class="cta-input" type="email" placeholder="输入你的企业邮箱">
+          <button class="btn-primary" style="padding: 12px 28px; font-size: 13px;">
+            申请内测资格
+          </button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =================== FOOTER =================== -->
+  <footer>
+    <div class="footer-inner">
+      <div class="footer-top">
+        <div class="footer-brand">
+          <span class="logo-text">NEXUS<span style="color:var(--accent-gold)"> AI</span></span>
+          <p>以通用大模型为核心，构建下一代 AI 基础设施。让智能真正融入每一个关键决策与创造性工作。</p>
+          <div class="footer-social">
+            <a href="#" class="social-btn">
+              <svg viewBox="0 0 24 24"><path d="M23 3a10.9 10.9 0 01-3.14 1.53 4.48 4.48 0 00-7.86 3v1A10.66 10.66 0 013 4s-4 9 5 13a11.64 11.64 0 01-7 2c9 5 20 0 20-11.5a4.5 4.5 0 00-.08-.83A7.72 7.72 0 0023 3z"/></svg>
+            </a>
+            <a href="#" class="social-btn">
+              <svg viewBox="0 0 24 24"><path d="M16 8a6 6 0 016 6v7h-4v-7a2 2 0 00-2-2 2 2 0 00-2 2v7h-4v-7a6 6 0 016-6zM2 9h4v12H2z"/><circle cx="4" cy="4" r="2"/></svg>
+            </a>
+            <a href="#" class="social-btn">
+              <svg viewBox="0 0 24 24"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 00-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0020 4.77 5.07 5.07 0 0019.91 1S18.73.65 16 2.48a13.38 13.38 0 00-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 005 4.77a5.44 5.44 0 00-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 009 18.13V22"/></svg>
+            </a>
+          </div>
+        </div>
+
+        <div class="footer-col">
+          <h4>产品</h4>
+          <ul>
+            <li><a href="#">NEXUS-ULTRA</a></li>
+            <li><a href="#">NEXUS-SWIFT</a></li>
+            <li><a href="#">NEXUS-CODE</a></li>
+            <li><a href="#">NEXUS-VISION</a></li>
+            <li><a href="#">NEXUS-PRIVATE</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-col">
+          <h4>开发者</h4>
+          <ul>
+            <li><a href="#">API 文档</a></li>
+            <li><a href="#">SDK 下载</a></li>
+            <li><a href="#">开发者社区</a></li>
+            <li><a href="#">示例代码库</a></li>
+            <li><a href="#">更新日志</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-col">
+          <h4>公司</h4>
+          <ul>
+            <li><a href="#">关于我们</a></li>
+            <li><a href="#">研究博客</a></li>
+            <li><a href="#">职位招募</a></li>
+            <li><a href="#">媒体资源</a></li>
+            <li><a href="#">联系我们</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-col">
+          <h4>安全与合规</h4>
+          <ul>
+            <li><a href="#">安全白皮书</a></li>
+            <li><a href="#">AI 使用政策</a></li>
+            <li><a href="#">ISO 27001 认证</a></li>
+            <li><a href="#">SOC 2 报告</a></li>
+            <li><a href="#">漏洞披露</a></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="footer-bottom">
+        <p class="footer-copyright">© 2025 NEXUS AI Technologies, Inc. 保留所有权利。</p>
+        <div class="footer-legal">
+          <a href="#">隐私政策</a>
+          <a href="#">服务条款</a>
+          <a href="#">Cookie 设置</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+</div>
+
+<script>
+// ============================================================
+// CUSTOM CURSOR
+// ============================================================
+const cursorDot = document.getElementById('cursorDot');
+const cursorRing = document.getElementById('cursorRing');
+let mouseX = 0, mouseY = 0;
+let ringX = 0, ringY = 0;
+
+document.addEventListener('mousemove', (e) => {
+  mouseX = e.clientX;
+  mouseY = e.clientY;
+  cursorDot.style.left = mouseX + 'px';
+  cursorDot.style.top = mouseY + 'px';
+});
+
+function animateCursor() {
+  ringX += (mouseX - ringX) * 0.12;
+  ringY += (mouseY - ringY) * 0.12;
+  cursorRing.style.left = ringX + 'px';
+  cursorRing.style.top = ringY + 'px';
+  requestAnimationFrame(animateCursor);
+}
+animateCursor();
+
+document.querySelectorAll('a, button, .model-card, .usecase-card, .cap-item').forEach(el => {
+  el.addEventListener('mouseenter', () => cursorRing.classList.add('hovering'));
+  el.addEventListener('mouseleave', () => cursorRing.classList.remove('hovering'));
+});
+
+// ============================================================
+// WEBGL BACKGROUND — Liquid Blobs
+// ============================================================
+const bgCanvas = document.getElementById('bg-canvas');
+const gl = bgCanvas.getContext('webgl') || bgCanvas.getContext('experimental-webgl');
+
+function resizeBgCanvas() {
+  bgCanvas.width = window.innerWidth;
+  bgCanvas.height = window.innerHeight;
+  if (gl) gl.viewport(0, 0, bgCanvas.width, bgCanvas.height);
+}
+resizeBgCanvas();
+window.addEventListener('resize', resizeBgCanvas);
+
+if (gl) {
+  const vertSrc = `
+    attribute vec2 a_position;
+    void main() {
+      gl_Position = vec4(a_position, 0.0, 1.0);
+    }
+  `;
+
+  const fragSrc = `
+    precision highp float;
+    uniform vec2 u_resolution;
+    uniform float u_time;
+    uniform vec2 u_mouse;
+
+    float sdSphere(vec2 p, vec2 c, float r) {
+      return length(p - c) - r;
+    }
+
+    float smoothMin(float a, float b, float k) {
+      float h = max(k - abs(a - b), 0.0) / k;
+      return min(a, b) - h * h * h * k * (1.0 / 6.0);
+    }
+
+    vec2 hash2(vec2 p) {
+      p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
+      return fract(sin(p) * 43758.5453);
+    }
+
+    float noise(vec2 p) {
+      vec2 i = floor(p);
+      vec2 f = fract(p);
+      f = f * f * (3.0 - 2.0 * f);
+      float a = dot(hash2(i), f - vec2(0,0));
+      float b = dot(hash2(i + vec2(1,0)), f - vec2(1,0));
+      float c2 = dot(hash2(i + vec2(0,1)), f - vec2(0,1));
+      float d = dot(hash2(i + vec2(1,1)), f - vec2(1,1));
+      return mix(mix(a, b, f.x), mix(c2, d, f.x), f.y);
+    }
+
+    void main() {
+      vec2 uv = gl_FragCoord.xy / u_resolution.xy;
+      uv.y = 1.0 - uv.y;
+      float aspect = u_resolution.x / u_resolution.y;
+      vec2 p = uv * vec2(aspect, 1.0);
+
+      vec2 mouse = u_mouse * vec2(aspect, 1.0);
+      float t = u_time * 0.12;
+
+      // Define blob positions with organic motion
+      vec2 b1 = vec2(
+        0.2 * aspect + 0.22 * aspect * sin(t * 0.7 + 1.0) + 0.08 * aspect * sin(t * 1.3),
+        0.3 + 0.22 * cos(t * 0.5 + 0.5) + 0.06 * cos(t * 1.7)
+      );
+      vec2 b2 = vec2(
+        0.75 * aspect + 0.2 * aspect * cos(t * 0.6 + 2.0) + 0.07 * aspect * cos(t * 1.1),
+        0.55 + 0.2 * sin(t * 0.8 + 1.0) + 0.07 * sin(t * 2.1)
+      );
+      vec2 b3 = vec2(
+        0.5 * aspect + 0.3 * aspect * sin(t * 0.4 + 3.0) + 0.1 * aspect * sin(t * 0.9),
+        0.7 + 0.2 * cos(t * 0.6 + 2.0) + 0.05 * cos(t * 1.4)
+      );
+      vec2 b4 = vec2(
+        0.15 * aspect + 0.15 * aspect * cos(t * 1.1),
+        0.75 + 0.15 * sin(t * 0.9)
+      );
+      vec2 b5 = vec2(
+        0.85 * aspect + 0.12 * aspect * sin(t * 0.8 + 4.0),
+        0.2 + 0.18 * cos(t * 1.2)
+      );
+
+      float r1 = 0.18 + 0.04 * sin(t * 1.5);
+      float r2 = 0.20 + 0.04 * cos(t * 1.2 + 1.0);
+      float r3 = 0.22 + 0.05 * sin(t * 0.9 + 2.0);
+      float r4 = 0.14 + 0.03 * cos(t * 1.8);
+      float r5 = 0.16 + 0.04 * sin(t * 1.4 + 1.0);
+
+      float d1 = sdSphere(p, b1, r1);
+      float d2 = sdSphere(p, b2, r2);
+      float d3 = sdSphere(p, b3, r3);
+      float d4 = sdSphere(p, b4, r4);
+      float d5 = sdSphere(p, b5, r5);
+
+      float d = d1;
+      d = smoothMin(d, d2, 0.22);
+      d = smoothMin(d, d3, 0.26);
+      d = smoothMin(d, d4, 0.18);
+      d = smoothMin(d, d5, 0.20);
+
+      // Mouse influence — subtle repulsion
+      float mouseDist = length(p - mouse);
+      float mouseInfluence = smoothstep(0.25, 0.0, mouseDist) * 0.06;
+      d += mouseInfluence;
+
+      // Add subtle surface distortion noise
+      float n = noise(p * 3.5 + t * 0.6) * 0.025
+              + noise(p * 7.0 - t * 0.4) * 0.012;
+      d += n;
+
+      // Color palette — very dark navy / deep teal
+      vec3 bgColor = vec3(0.030, 0.038, 0.058);
+
+      // Blob inner colors
+      vec3 col1 = vec3(0.06, 0.10, 0.20);
+      vec3 col2 = vec3(0.04, 0.14, 0.22);
+      vec3 col3 = vec3(0.08, 0.08, 0.18);
+
+      // Blend based on distance field
+      float fill = smoothstep(0.02, -0.06, d);
+      float glow = smoothstep(0.18, 0.0, d) * 0.5;
+      float rim  = smoothstep(0.0, 0.03, abs(d)) * smoothstep(0.08, 0.0, abs(d));
+
+      // Determine closest blob for color mixing
+      float w1 = 1.0 / (abs(sdSphere(p, b1, r1)) + 0.01);
+      float w2 = 1.0 / (abs(sdSphere(p, b2, r2)) + 0.01);
+      float w3 = 1.0 / (abs(sdSphere(p, b3, r3)) + 0.01);
+      float wTotal = w1 + w2 + w3;
+      vec3 blobColor = (col1 * w1 + col2 * w2 + col3 * w3) / wTotal;
+
+      // Specular highlight — simulating glass refraction
+      vec2 grad = vec2(
+        dFdx(d),
+        dFdy(d)
+      );
+      vec3 normal3 = normalize(vec3(grad * u_resolution.y, 0.5));
+      vec3 lightDir = normalize(vec3(0.4, 0.6, 0.8));
+      float spec = pow(max(dot(normal3, lightDir), 0.0), 32.0);
+      float specRim = pow(max(dot(normal3, normalize(vec3(-0.3, 0.5, 0.7))), 0.0), 16.0);
+
+      vec3 finalColor = bgColor;
+      finalColor = mix(finalColor, blobColor, glow);
+      finalColor = mix(finalColor, blobColor * 1.3, fill * 0.8);
+
+      // Glass refraction highlight on edges
+      vec3 glassSpec = vec3(0.3, 0.38, 0.55) * spec * fill * 2.5;
+      vec3 rimLight  = vec3(0.15, 0.25, 0.45) * specRim * fill * 1.5;
+      finalColor += glassSpec + rimLight;
+
+      // Rim glow
+      finalColor += vec3(0.05, 0.09, 0.20) * rim * 0.8;
+
+      // Vignette
+      float vignette = 1.0 - smoothstep(0.4, 1.2, length(uv - 0.5) * 1.4);
+      finalColor *= vignette * 0.7 + 0.3;
+
+      gl_FragColor = vec4(finalColor, 1.0);
+    }
+  `;
+
+  function createShader(type, src) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src);
+    gl.compileShader(s);
+    return s;
+  }
+
+  const prog = gl.createProgram();
+  gl.attachShader(prog, createShader(gl.VERTEX_SHADER, vertSrc));
+  gl.attachShader(prog, createShader(gl.FRAGMENT_SHADER, fragSrc));
+  gl.linkProgram(prog);
+  gl.useProgram(prog);
+
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+
+  const posLoc = gl.getAttribLocation(prog, 'a_position');
+  gl.enableVertexAttribArray(posLoc);
+  gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
+
+  const uRes   = gl.getUniformLocation(prog, 'u_resolution');
+  const uTime  = gl.getUniformLocation(prog, 'u_time');
+  const uMouse = gl.getUniformLocation(prog, 'u_mouse');
+
+  let glMouseX = 0.5, glMouseY = 0.5;
+  let glTargetX = 0.5, glTargetY = 0.5;
+
+  document.addEventListener('mousemove', e => {
+    glTargetX = e.clientX / window.innerWidth;
+    glTargetY = e.clientY / window.innerHeight;
+  });
+
+  let startTime = performance.now();
+
+  function renderGL() {
+    glMouseX += (glTargetX - glMouseX) * 0.04;
+    glMouseY += (glTargetY - glMouseY) * 0.04;
+
+    gl.uniform2f(uRes, bgCanvas.width, bgCanvas.height);
+    gl.uniform1f(uTime, (performance.now() - startTime) / 1000);
+    gl.uniform2f(uMouse, glMouseX, glMouseY);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    requestAnimationFrame(renderGL);
+  }
+  renderGL();
+}
+
+// ============================================================
+// GLASS CARD MOUSE PARALLAX & REFRACTION
+// ============================================================
+document.querySelectorAll('.model-card, .usecase-card').forEach(card => {
+  card.addEventListener('mousemove', (e) => {
+    const rect = card.getBoundingClientRect();
+    const cx = (e.clientX - rect.left) / rect.width;
+    const cy = (e.clientY - rect.top) / rect.height;
+    const mx = (cx - 0.5) * 2;
+    const my = (cy - 0.5) * 2;
+
+    card.style.transform = `translateY(-6px) rotateX(${-my * 5}deg) rotateY(${mx * 5}deg)`;
+    card.style.setProperty('--mx', (cx * 100) + '%');
+    card.style.setProperty('--my', (cy * 100) + '%');
+  });
+
+  card.addEventListener('mouseleave', () => {
+    card.style.transform = '';
+    card.style.transition = 'transform 0.6s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.5s ease, border-color 0.4s ease';
+    setTimeout(() => { card.style.transition = ''; }, 600);
+  });
+});
+
+// ============================================================
+// SCROLL EFFECTS
+// ============================================================
+// Nav scroll state
+const mainNav = document.getElementById('main-nav');
+window.addEventListener('scroll', () => {
+  if (window.scrollY > 60) {
+    mainNav.classList.add('scrolled');
+  } else {
+    mainNav.classList.remove('scrolled');
+  }
+}, { passive: true });
+
+// Reveal on scroll
+const revealEls = document.querySelectorAll('.reveal');
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.classList.add('visible');
+    }
+  });
+}, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+
+revealEls.forEach(el => observer.observe(el));
+
+// ============================================================
+// REFRACTION CANVAS — Glass Edge Distortion
+// ============================================================
+const refCanvas = document.getElementById('refraction-canvas');
+const rCtx = refCanvas.getContext('2d');
+
+function resizeRefCanvas() {
+  refCanvas.width = window.innerWidth;
+  refCanvas.height = window.innerHeight;
+}
+resizeRefCanvas();
+window.addEventListener('resize', resizeRefCanvas);
+
+let refMouseX = 0, refMouseY = 0;
+document.addEventListener('mousemove', e => {
+  refMouseX = e.clientX;
+  refMouseY = e.clientY;
+});
+
+function drawRefraction() {
+  rCtx.clearRect(0, 0, refCanvas.width, refCanvas.height);
+  const t = performance.now() / 1000;
+
+  // Draw subtle glass lens effects following mouse
+  const gx = refMouseX;
+  const gy = refMouseY;
+
+  // Mouse glass lens caustic
+  const causticGrad = rCtx.createRadialGradient(gx, gy, 0, gx, gy, 120);
+  causticGrad.addColorStop(0, 'rgba(255, 255, 255, 0.0)');
+  causticGrad.addColorStop(0.65, 'rgba(255, 255, 255, 0.012)');
+  causticGrad.addColorStop(0.85, 'rgba(200, 220, 255, 0.025)');
+  causticGrad.addColorStop(1.0, 'rgba(255, 255, 255, 0.0)');
+
+  rCtx.beginPath();
+  rCtx.arc(gx, gy, 120, 0, Math.PI * 2);
+  rCtx.fillStyle = causticGrad;
+  rCtx.fill();
+
+  // Thin specular ring around cursor
+  rCtx.beginPath();
+  rCtx.arc(gx, gy, 118, 0, Math.PI * 2);
+  rCtx.strokeStyle = 'rgba(255,255,255,0.03)';
+  rCtx.lineWidth = 2;
+  rCtx.stroke();
+
+  requestAnimationFrame(drawRefraction);
+}
+drawRefraction();
+
+// ============================================================
+// COUNTER ANIMATION
+// ============================================================
+function animateCounter(el, target, suffix, decimals = 0) {
+  let start = 0;
+  const duration = 2000;
+  const startTime = performance.now();
+
+  function update(now) {
+    const elapsed = now - startTime;
+    const progress = Math.min(elapsed / duration, 1);
+    const eased = 1 - Math.pow(1 - progress, 3);
+    const current = start + (target - start) * eased;
+    el.textContent = decimals > 0 ? current.toFixed(decimals) : Math.floor(current);
+    if (progress < 1) requestAnimationFrame(update);
+    else el.textContent = decimals > 0 ? target.toFixed(decimals) : target;
+  }
+  requestAnimationFrame(update);
+}
+
+// Observe stat numbers
+const statNums = document.querySelectorAll('.stat-number');
+const counterObserver = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      const el = entry.target;
+      const data = el.dataset;
+      if (!el.dataset.animated) {
+        el.dataset.animated = 'true';
+        const vals = [
+          { val: 12, suffix: 'T', decimals: 0 },
+          { val: 98.7, suffix: '%', decimals: 1 },
+          { val: 200, suffix: 'K', decimals: 0 },
+          { val: 50, suffix: '+', decimals: 0 }
+        ];
+        const idx = Array.from(statNums).indexOf(el);
+        if (vals[idx]) {
+          const numSpan = document.createElement('span');
+          const unit = el.querySelector('.unit');
+          const unitText = unit ? unit.outerHTML : '';
+          el.innerHTML = '0' + unitText;
+          const textNode = el.childNodes[0];
+          animateCounter(textNode, vals[idx].val, vals[idx].suffix, vals[idx].decimals);
+        }
+      }
+    }
+  }, { threshold: 0.8 });
+});
+statNums.forEach(el => counterObserver.observe(el));
+
+// ============================================================
+// SMOOTH SCROLL
+// ============================================================
+document.querySelectorAll('a[href^="#"]').forEach(a => {
+  a.addEventListener('click', e => {
+    const target = document.querySelector(a.getAttribute('href'));
+    if (target) {
+      e.preventDefault();
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  });
+});
+</script>
+</body>
+</html>

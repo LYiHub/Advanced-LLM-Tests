@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Analog Clock</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  
+  body {
+    background: #fff;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Georgia', serif;
+    padding: 20px;
+  }
+  
+  .clock {
+    position: relative;
+    width: min(80vw, 80vh, 400px);
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background: #fff;
+    border: 8px solid #222;
+    box-shadow: 
+      inset 0 0 20px rgba(0,0,0,0.1),
+      0 10px 30px rgba(0,0,0,0.2);
+  }
+  
+  .number {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    text-align: center;
+    font-size: clamp(1rem, 4vw, 1.8rem);
+    font-weight: bold;
+    color: #222;
+  }
+  
+  .number span {
+    position: absolute;
+    top: 6%;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+  
+  .n1  { transform: rotate(30deg); }
+  .n1 span  { transform: translateX(-50%) rotate(-30deg); }
+  .n2  { transform: rotate(60deg); }
+  .n2 span  { transform: translateX(-50%) rotate(-60deg); }
+  .n3  { transform: rotate(90deg); }
+  .n3 span  { transform: translateX(-50%) rotate(-90deg); }
+  .n4  { transform: rotate(120deg); }
+  .n4 span  { transform: translateX(-50%) rotate(-120deg); }
+  .n5  { transform: rotate(150deg); }
+  .n5 span  { transform: translateX(-50%) rotate(-150deg); }
+  .n6  { transform: rotate(180deg); }
+  .n6 span  { transform: translateX(-50%) rotate(-180deg); }
+  .n7  { transform: rotate(210deg); }
+  .n7 span  { transform: translateX(-50%) rotate(-210deg); }
+  .n8  { transform: rotate(240deg); }
+  .n8 span  { transform: translateX(-50%) rotate(-240deg); }
+  .n9  { transform: rotate(270deg); }
+  .n9 span  { transform: translateX(-50%) rotate(-270deg); }
+  .n10 { transform: rotate(300deg); }
+  .n10 span { transform: translateX(-50%) rotate(-300deg); }
+  .n11 { transform: rotate(330deg); }
+  .n11 span { transform: translateX(-50%) rotate(-330deg); }
+  
+  .hand {
+    position: absolute;
+    left: 50%;
+    bottom: 50%;
+    transform-origin: bottom center;
+    border-radius: 4px;
+  }
+  
+  .hour {
+    width: 2.5%;
+    height: 28%;
+    background: #222;
+    transform: translateX(-50%) rotate(-55deg); /* 10:10 hour */
+  }
+  
+  .minute {
+    width: 1.8%;
+    height: 38%;
+    background: #222;
+    transform: translateX(-50%) rotate(60deg); /* 10:10 minute */
+  }
+  
+  .second {
+    width: 1%;
+    height: 42%;
+    background: #e53935;
+    transform-origin: bottom center;
+    animation: tick 60s steps(60, end) infinite;
+  }
+  
+  @keyframes tick {
+    from { transform: translateX(-50%) rotate(0deg); }
+    to   { transform: translateX(-50%) rotate(360deg); }
+  }
+  
+  .center {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 4%;
+    height: 4%;
+    background: #e53935;
+    border: 2px solid #222;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 10;
+  }
+</style>
+</head>
+<body>
+  <div class="clock">
+    <div class="number n1"><span>I</span></div>
+    <div class="number n2"><span>II</span></div>
+    <div class="number n3"><span>III</span></div>
+    <div class="number n4"><span>IV</span></div>
+    <div class="number n5"><span>V</span></div>
+    <div class="number n6"><span>VI</span></div>
+    <div class="number n7"><span>VII</span></div>
+    <div class="number n8"><span>VIII</span></div>
+    <div class="number n9"><span>IX</span></div>
+    <div class="number n10"><span>X</span></div>
+    <div class="number n11"><span>XI</span></div>
+    <div class="number" style="transform: rotate(360deg);"><span>XII</span></div>
+    
+    <div class="hand hour"></div>
+    <div class="hand minute"></div>
+    <div class="hand second"></div>
+    <div class="center"></div>
+  </div>
+</body>
+</html>

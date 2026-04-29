@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Analog Clock – 10:10</title>
+<style>
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    background: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    font-family: 'Georgia', 'Times New Roman', serif;
+  }
+
+  .clock-wrapper {
+    width: min(80vw, 80vh, 500px);
+    aspect-ratio: 1;
+    position: relative;
+  }
+
+  .clock {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    position: relative;
+    background: radial-gradient(circle at 35% 35%, #ffffff 0%, #f4f2ef 60%, #e8e5e0 100%);
+    box-shadow:
+      0 0 0 8px #2c2c2c,
+      0 0 0 10px #555,
+      0 0 0 14px rgba(0,0,0,0.1),
+      0 8px 30px rgba(0,0,0,0.25),
+      inset 0 2px 8px rgba(0,0,0,0.06);
+  }
+
+  /* Inner decorative ring */
+  .clock::before {
+    content: '';
+    position: absolute;
+    top: 3%;
+    left: 3%;
+    width: 94%;
+    height: 94%;
+    border-radius: 50%;
+    border: 1px solid rgba(0,0,0,0.06);
+  }
+
+  /* Tick marks */
+  .tick {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: 2px;
+    height: 50%;
+    transform-origin: bottom center;
+    z-index: 1;
+  }
+
+  .tick::before {
+    content: '';
+    display: block;
+    width: 2px;
+    height: 14px;
+    background: #2c2c2c;
+    margin: 6% auto 0;
+    border-radius: 1px;
+  }
+
+  .tick.major::before {
+    width: 3.5px;
+    height: 22px;
+    background: #1a1a1a;
+    border-radius: 2px;
+  }
+
+  .tick:nth-child(1)  { transform: translateX(-50%) rotate(30deg);  }
+  .tick:nth-child(2)  { transform: translateX(-50%) rotate(60deg);  }
+  .tick:nth-child(3)  { transform: translateX(-50%) rotate(90deg);  }
+  .tick:nth-child(4)  { transform: translateX(-50%) rotate(120deg); }
+  .tick:nth-child(5)  { transform: translateX(-50%) rotate(150deg); }
+  .tick:nth-child(6)  { transform: translateX(-50%) rotate(180deg); }
+  .tick:nth-child(7)  { transform: translateX(-50%) rotate(210deg); }
+  .tick:nth-child(8)  { transform: translateX(-50%) rotate(240deg); }
+  .tick:nth-child(9)  { transform: translateX(-50%) rotate(270deg); }
+  .tick:nth-child(10) { transform: translateX(-50%) rotate(300deg); }
+  .tick:nth-child(11) { transform: translateX(-50%) rotate(330deg); }
+  .tick:nth-child(12) { transform: translateX(-50%) rotate(360deg); }
+
+  /* Numerals */
+  .numeral {
+    position: absolute;
+    font-size: clamp(12px, 4.5vw, 26px);
+    font-weight: 700;
+    color: #2c2c2c;
+    text-align: center;
+    width: 2em;
+    height: 2em;
+    line-height: 2em;
+    z-index: 2;
+  }
+
+  .numeral-12 { top: 6%;  left: 50%; transform: translateX(-50%); }
+  .numeral-1  { top: 10%; right: 17%; }
+  .numeral-2  { top: 22%; right: 7%; }
+  .numeral-3  { top: 46%; right: 2%; transform: translateY(-50%); }
+  .numeral-4  { bottom: 22%; right: 7%; }
+  .numeral-5  { bottom: 10%; right: 17%; }
+  .numeral-6  { bottom: 6%; left: 50%; transform: translateX(-50%); }
+  .numeral-7  { bottom: 10%; left: 17%; }
+  .numeral-8  { bottom: 22%; left: 7%; }
+  .numeral-9  { top: 46%; left: 2%; transform: translateY(-50%); }
+  .numeral-10 { top: 22%; left: 5%; }
+  .numeral-11 { top: 10%; left: 15%; }
+
+  /* Hands container */
+  .hands {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    z-index: 10;
+  }
+
+  /* Hour hand – 10:10 → 305deg */
+  .hand-hour {
+    position: absolute;
+    bottom: 0;
+    left: -4px;
+    width: 8px;
+    height: 26%;
+    background: linear-gradient(to right, #1a1a1a, #2c2c2c, #1a1a1a);
+    border-radius: 4px 4px 2px 2px;
+    transform-origin: bottom center;
+    transform: rotate(305deg);
+    box-shadow: 1px 2px 4px rgba(0,0,0,0.3);
+    z-index: 12;
+  }
+
+  .hand-hour::after {
+    content: '';
+    position: absolute;
+    bottom: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 4px;
+    height: 8px;
+    background: #2c2c2c;
+    border-radius: 0 0 2px 2px;
+  }
+
+  /* Minute hand – 10 min → 60deg */
+  .hand-minute {
+    position: absolute;
+    bottom: 0;
+    left: -3px;
+    width: 6px;
+    height: 34%;
+    background: linear-gradient(to right, #1a1a1a, #3a3a3a, #1a1a1a);
+    border-radius: 3px 3px 1px 1px;
+    transform-origin: bottom center;
+    transform: rotate(60deg);
+    box-shadow: 1px 2px 4px rgba(0,0,0,0.25);
+    z-index: 13;
+  }
+
+  .hand-minute::after {
+    content: '';
+    position: absolute;
+    bottom: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 3px;
+    height: 10px;
+    background: #3a3a3a;
+    border-radius: 0 0 2px 2px;
+  }
+
+  /* Second hand – animated */
+  .hand-second {
+    position: absolute;
+    bottom: -8%;
+    left: -1px;
+    width: 2px;
+    height: 42%;
+    background: #c0392b;
+    border-radius: 1px;
+    transform-origin: 50% 81%;
+    z-index: 14;
+    animation: rotate-second 60s linear infinite;
+    box-shadow: 0 0 3px rgba(192,57,43,0.3);
+  }
+
+  .hand-second::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 6px;
+    height: 6px;
+    background: #c0392b;
+    border-radius: 50%;
+  }
+
+  .hand-second::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 4px;
+    height: 12%;
+    background: #c0392b;
+    border-radius: 2px;
+  }
+
+  @keyframes rotate-second {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+  }
+
+  /* Center cap */
+  .center-cap {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 14px;
+    height: 14px;
+    background: radial-gradient(circle at 40% 35%, #555, #1a1a1a);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 20;
+    box-shadow: 0 0 4px rgba(0,0,0,0.3);
+  }
+
+  .center-cap::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 4px;
+    height: 4px;
+    background: #c0392b;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+  }
+
+  /* Brand text */
+  .brand {
+    position: absolute;
+    top: 62%;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: clamp(7px, 1.8vw, 11px);
+    color: #888;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    z-index: 2;
+  }
+
+  /* Sub-dial decoration */
+  .sub-dial {
+    position: absolute;
+    top: 28%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 18%;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    border: 1px solid rgba(0,0,0,0.08);
+    z-index: 2;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .hand-second {
+      animation: none;
+      transform: rotate(0deg);
+    }
+  }
+</style>
+</head>
+<body>
+
+<div class="clock-wrapper">
+  <div class="clock">
+
+    <!-- Tick marks -->
+    <div class="tick major"></div>
+    <div class="tick"></div>
+    <div class="tick major"></div>
+    <div class="tick"></div>
+    <div class="tick major"></div>
+    <div class="tick"></div>
+    <div class="tick major"></div>
+    <div class="tick"></div>
+    <div class="tick major"></div>
+    <div class="tick"></div>
+    <div class="tick major"></div>
+    <div class="tick"></div>
+
+    <!-- Numerals -->
+    <div class="numeral numeral-12">12</div>
+    <div class="numeral numeral-1">1</div>
+    <div class="numeral numeral-2">2</div>
+    <div class="numeral numeral-3">3</div>
+    <div class="numeral numeral-4">4</div>
+    <div class="numeral numeral-5">5</div>
+    <div class="numeral numeral-6">6</div>
+    <div class="numeral numeral-7">7</div>
+    <div class="numeral numeral-8">8</div>
+    <div class="numeral numeral-9">9</div>
+    <div class="numeral numeral-10">10</div>
+    <div class="numeral numeral-11">11</div>
+
+    <!-- Decorative sub-dial -->
+    <div class="sub-dial"></div>
+
+    <!-- Brand -->
+    <div class="brand">Swiss Made</div>
+
+    <!-- Hands -->
+    <div class="hands">
+      <div class="hand-hour"></div>
+      <div class="hand-minute"></div>
+      <div class="hand-second"></div>
+    </div>
+
+    <!-- Center cap -->
+    <div class="center-cap"></div>
+
+  </div>
+</div>
+
+</body>
+</html>

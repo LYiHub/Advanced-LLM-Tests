@@ -1,0 +1,584 @@
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Timepiece 10:10</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&amp;family=Lato:wght@300;400;700&amp;display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            'serif': ['"Playfair Display"', 'serif'],
+            'sans': ['"Lato"', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #fcfcfc;
+      background-image: radial-gradient(circle at 50% 50%, #ffffff 0%, #f0f2f5 100%);
+      font-family: 'Lato', sans-serif;
+    }
+
+    /* 
+      Clock Geometry System
+      Base unit: 300px. 
+      Scale factor handled by CSS Variables to ensure perfect sync across hands, ticks, and glow.
+    */
+    :root {
+      --clock-size: 300px;
+      --face-color: #ffffff;
+      --case-color: #e2e4e6;
+      --shadow-color: rgba(60, 70, 80, 0.15);
+    }
+
+    @media (min-width: 640px) {
+      :root { --clock-size: 450px; }
+    }
+
+    @media (min-width: 1024px) {
+      :root { --clock-size: 600px; }
+    }
+
+    .watch-container {
+      position: relative;
+      width: var(--clock-size);
+      height: var(--clock-size);
+      margin: 0 auto;
+      /* 3D Perspective for the watch case tilt */
+      transform-style: preserve-3d;
+      transition: transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .watch-case {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      border-radius: 50%;
+      background: linear-gradient(145deg, #f0f2f5, #d1d5db);
+      box-shadow: 
+        20px 20px 60px #bebebe, 
+        -20px -20px 60px #ffffff,
+        inset 2px 2px 5px rgba(255,255,255,0.8),
+        inset -2px -2px 5px rgba(0,0,0,0.05);
+      z-index: 1;
+    }
+
+    .watch-crown {
+      position: absolute;
+      top: 50%;
+      right: -12px;
+      transform: translateY(-50%);
+      width: 16px;
+      height: 40px;
+      background: #d1d5db;
+      border-radius: 4px;
+      box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
+      z-index: 0;
+    }
+
+    .watch-dial {
+      position: absolute;
+      top: 5%;
+      left: 5%;
+      width: 90%;
+      height: 90%;
+      background: var(--face-color);
+      border-radius: 50%;
+      box-shadow: 
+        inset 5px 5px 15px rgba(0,0,0,0.05),
+        inset -2px -2px 10px rgba(255,255,255,0.8);
+      z-index: 2;
+      overflow: hidden;
+    }
+
+    /* Inner Bezel Ring */
+    .inner-bezel {
+      position: absolute;
+      top: 8%;
+      left: 8%;
+      width: 84%;
+      height: 84%;
+      border: 1px solid rgba(0,0,0,0.05);
+      border-radius: 50%;
+      pointer-events: none;
+    }
+
+    /* Dynamic Lighting Effect on Glass */
+    .glass-glare {
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0) 50%);
+      pointer-events: none;
+      z-index: 20;
+      border-radius: 50%;
+      transition: transform 0.1s ease-out;
+    }
+
+    /* --- Hands --- */
+    .hand {
+      position: absolute;
+      bottom: 50%;
+      left: 50%;
+      transform-origin: bottom center;
+      border-radius: 999px;
+      z-index: 10;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+    }
+
+    .hand-center-pivot {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 12px;
+      height: 12px;
+      background: radial-gradient(circle, #333 30%, #000 100%);
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 15;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    }
+
+    .hand-center-pivot::after {
+      content: '';
+      position: absolute;
+      top: 3px; left: 3px;
+      width: 6px; height: 6px;
+      background: #fff;
+      border-radius: 50%;
+      opacity: 0.8;
+    }
+
+    /* Hour Hand */
+    .hand-hour {
+      width: 8px;
+      height: 28%;
+      background: linear-gradient(to top, #1a1a1a, #4a4a4a);
+      margin-left: -4px;
+      transform: rotate(300deg); /* 10:00 */
+    }
+
+    /* Minute Hand */
+    .hand-minute {
+      width: 6px;
+      height: 40%;
+      background: linear-gradient(to top, #1a1a1a, #4a4a4a);
+      margin-left: -3px;
+      transform: rotate(60deg); /* 10 mins */
+    }
+
+    /* Second Hand */
+    .hand-second {
+      width: 2px;
+      height: 48%;
+      background: linear-gradient(to top, #991b1b, #ef4444);
+      margin-left: -1px;
+      /* Start at 10 seconds (60 degrees) to align with 10:10 vibe, 
+         or at 0. Let's start at 0 for clean animation start */
+      transform: rotate(0deg); 
+      z-index: 12;
+      box-shadow: 0 0 5px rgba(239, 68, 68, 0.4);
+    }
+
+    .hand-second::before {
+      /* Counterweight */
+      content: '';
+      position: absolute;
+      bottom: -15px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 4px;
+      height: 15px;
+      background: #ef4444;
+      border-radius: 2px;
+    }
+
+    .hand-second::after {
+      /* Lume pip */
+      content: '';
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 2px;
+      height: 2px;
+      background: #fff;
+      border-radius: 50%;
+    }
+
+    /* Smooth sweep vs Tick - Using JS for smooth, but CSS fallback for load */
+    @keyframes sweep {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    /* --- Ticks & Numerals --- */
+    .tick {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      pointer-events: none;
+    }
+
+    .tick-mark {
+      position: absolute;
+      background: #333;
+      left: 50%;
+      transform-origin: 50% calc(var(--clock-size) * 0.45); /* Radius approximation */
+      /* We will adjust top/height in specific classes */
+    }
+    
+    /* We will use a different strategy for ticks to be responsive: transform translate */
+    .tick-item {
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 2px;
+      background: #374151;
+      transform-origin: center;
+    }
+
+    /* Hour Tick */
+    .tick-hour {
+      height: 16px;
+      margin-top: calc(var(--clock-size) * -0.44); /* push out */
+      width: 3px;
+      border-radius: 2px;
+      background: #111827;
+    }
+
+    /* Minute Tick */
+    .tick-minute {
+      height: 6px;
+      margin-top: calc(var(--clock-size) * -0.46);
+      width: 1px;
+      background: #9ca3af;
+    }
+
+    .tick-label {
+      position: absolute;
+      top: 50%; left: 50%;
+      font-family: 'Playfair Display', serif;
+      font-size: calc(var(--clock-size) * 0.07);
+      color: #1f2937;
+      font-weight: 600;
+      transform: translate(-50%, -50%);
+      width: calc(var(--clock-size) * 0.18);
+      text-align: center;
+      line-height: 1;
+    }
+
+    /* Text on Dial */
+    .dial-text {
+      position: absolute;
+      width: 100%;
+      text-align: center;
+      left: 0;
+      color: #4b5563;
+      font-family: 'Lato', sans-serif;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+    .brand-top {
+      top: 22%;
+      font-size: calc(var(--clock-size) * 0.045);
+      font-weight: 700;
+    }
+    .model-bottom {
+      top: 72%;
+      font-size: calc(var(--clock-size) * 0.022);
+      color: #6b7280;
+    }
+    .swiss-made {
+      bottom: 12%;
+      font-size: calc(var(--clock-size) * 0.016);
+      color: #9ca3af;
+      letter-spacing: 0.15em;
+    }
+
+    /* Date Window */
+    .date-window {
+      position: absolute;
+      top: 50%; right: 15%;
+      transform: translateY(-50%);
+      width: calc(var(--clock-size) * 0.08);
+      height: calc(var(--clock-size) * 0.06);
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 2px;
+      box-shadow: inset 1px 1px 2px rgba(0,0,0,0.05);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Lato', sans-serif;
+      font-size: calc(var(--clock-size) * 0.03);
+      color: #111827;
+      font-weight: 700;
+      z-index: 5;
+    }
+
+    /* Ambient Animation */
+    @keyframes float {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-10px); }
+    }
+
+    /* UI Controls */
+    .controls {
+      position: fixed;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 1rem;
+      z-index: 50;
+    }
+    
+    .btn {
+      background: rgba(255,255,255,0.9);
+      border: 1px solid #e5e7eb;
+      padding: 10px 20px;
+      border-radius: 30px;
+      font-family: 'Lato', sans-serif;
+      font-size: 0.85rem;
+      color: #374151;
+      cursor: pointer;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+      transition: all 0.2s ease;
+      backdrop-filter: blur(5px);
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+      color: #111827;
+    }
+    
+    .btn.active {
+      background: #111827;
+      color: white;
+      border-color: #111827;
+    }
+
+  </style>
+</head>
+<body class="flex flex-col items-center justify-center h-screen w-full">
+
+  <!-- Interactive Watch Container -->
+  <div id="watchContainer" class="watch-container">
+    
+    <!-- Watch Case (Body) -->
+    <div class="watch-case"></div>
+    <div class="watch-crown"></div>
+
+    <!-- Watch Dial (Face) -->
+    <div class="watch-dial" id="watchDial">
+      
+      <!-- Visual Effects -->
+      <div class="glass-glare" id="glassGlare"></div>
+      <div class="inner-bezel"></div>
+
+      <!-- Dial Text -->
+      <div class="dial-text brand-top">Chronos</div>
+      <div class="dial-text model-bottom">Automatic</div>
+      <div class="dial-text swiss-made">Swiss Made</div>
+
+      <!-- Date Window -->
+      <div class="date-window" id="dateDisplay">10</div>
+
+      <!-- Ticks Container (Populated via JS for precision) -->
+      <div id="ticksContainer"></div>
+
+      <!-- Hands -->
+      <div class="hand hand-hour" id="hourHand"></div>
+      <div class="hand hand-minute" id="minuteHand"></div>
+      <div class="hand hand-second" id="secondHand"></div>
+
+      <!-- Center Cap -->
+      <div class="hand-center-pivot"></div>
+    </div>
+  </div>
+
+  <!-- Description / Branding -->
+  <div class="mt-12 text-center opacity-0 transition-opacity duration-1000" id="footerText">
+    <h2 class="text-3xl font-serif text-gray-800 mb-2 tracking-wide">The 10:10 Standard</h2>
+    <p class="text-gray-500 font-light max-w-md mx-auto leading-relaxed">
+      A symbol of perfection and balance. The hands frame the brand name, resembling a smile or a checkmark of approval.
+    </p>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <button class="btn active" onclick="setTime(10, 10)" id="btnClassic">10:10 Standard</button>
+    <button class="btn" onclick="setTime(8, 20)" id="btnV">V-Shape (8:20)</button>
+    <button class="btn" onclick="setTime(2, 50)" id="btnHappy">Smile (2:50)</button>
+    <button class="btn" onclick="toggleRealTime()" id="btnLive">Live Time</button>
+  </div>
+
+  <script>
+    const container = document.getElementById('watchContainer');
+    const hourHand = document.getElementById('hourHand');
+    const minuteHand = document.getElementById('minuteHand');
+    const secondHand = document.getElementById('secondHand');
+    const ticksContainer = document.getElementById('ticksContainer');
+    const dateDisplay = document.getElementById('dateDisplay');
+    const glare = document.getElementById('glassGlare');
+    const footerText = document.getElementById('footerText');
+
+    let isRealTime = false;
+    let animationFrame;
+
+    // Initialize Ticks
+    function initClockFace() {
+      for (let i = 0; i < 60; i++) {
+        const angle = i * 6; // degrees
+        const tick = document.createElement('div');
+        
+        // Style based on minute vs hour
+        if (i % 5 === 0) {
+          // Hour tick
+          tick.className = 'tick-item tick-hour';
+          // Add number for every 3rd hour (12, 3, 6, 9)
+          if (i % 15 === 0) {
+             const label = document.createElement('div');
+             label.className = 'tick-label';
+             let num = i / 5;
+             if (num === 0) num = 12;
+             
+             // Position number slightly outside tick
+             // We need to calculate position based on radius
+             // CSS variables help here, but let's use trig for robustness
+             const radius = 0.37; // percentage of clock size
+             const rad = (angle - 90) * (Math.PI / 180);
+             const x = 50 + (radius * 100) * Math.cos(rad);
+             const y = 50 + (radius * 100) * Math.sin(rad);
+             
+             label.style.left = `${x}%`;
+             label.style.top = `${y}%`;
+             label.innerText = num;
+             ticksContainer.appendChild(label);
+          }
+        } else {
+          // Minute tick
+          tick.className = 'tick-item tick-minute';
+        }
+        
+        tick.style.transform = `translate(-50%, -50%) rotate(${angle}deg) translateY(calc(var(--clock-size) * -0.42))`;
+        ticksContainer.appendChild(tick);
+      }
+    }
+
+    function updateDate() {
+      const now = new Date();
+      dateDisplay.innerText = now.getDate();
+    }
+
+    function setTime(hours, minutes) {
+      isRealTime = false;
+      cancelAnimationFrame(animationFrame);
+      document.getElementById('btnLive').classList.remove('active');
+      
+      // Reset buttons
+      document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+      if(hours === 10 && minutes === 10) document.getElementById('btnClassic').classList.add('active');
+      if(hours === 8 && minutes === 20) document.getElementById('btnV').classList.add('active');
+      if(hours === 2 && minutes === 50) document.getElementById('btnHappy').classList.add('active');
+
+      // Calculate degrees
+      // Hour hand: 360 / 12 = 30 deg per hour + 0.5 deg per minute
+      const hourDeg = (hours * 30) + (minutes * 0.5);
+      // Minute hand: 360 / 60 = 6 deg per minute
+      const minuteDeg = minutes * 6;
+
+      // Apply transitions for smooth movement
+      hourHand.style.transition = 'transform 1.5s cubic-bezier(0.34, 1.56, 0.64, 1)';
+      minuteHand.style.transition = 'transform 1.5s cubic-bezier(0.34, 1.56, 0.64, 1)';
+      secondHand.style.transition = 'transform 0.5s ease-out';
+
+      hourHand.style.transform = `rotate(${hourDeg}deg)`;
+      minuteHand.style.transform = `rotate(${minuteDeg}deg)`;
+      secondHand.style.transform = `rotate(0deg)`; // Reset second hand
+
+      // Trigger subtle second hand sweep after setting time
+      setTimeout(() => {
+          secondHand.style.transition = 'transform 60s linear';
+          secondHand.style.transform = `rotate(360deg)`;
+      }, 1600);
+    }
+
+    function toggleRealTime() {
+      isRealTime = !isRealTime;
+      const btn = document.getElementById('btnLive');
+      
+      if (isRealTime) {
+        btn.classList.add('active');
+        document.querySelectorAll('.controls button:not(#btnLive)').forEach(b => b.classList.remove('active'));
+        runClock();
+      } else {
+        btn.classList.remove('active');
+        setTime(10, 10); // Reset
+      }
+    }
+
+    function runClock() {
+      if (!isRealTime) return;
+
+      const now = new Date();
+      const sec = now.getSeconds();
+      const min = now.getMinutes();
+      const hr = now.getHours();
+      const ms = now.getMilliseconds();
+
+      // Smooth motion for seconds
+      const secDeg = ((sec + ms / 1000) / 60) * 360;
+      const minDeg = ((min + sec / 60) / 60) * 360;
+      const hrDeg = ((hr % 12 + min / 60) / 12) * 360;
+
+      // Remove transitions for real-time ticking (instant updates)
+      hourHand.style.transition = 'none';
+      minuteHand.style.transition = 'none';
+      secondHand.style.transition = 'none';
+
+      secondHand.style.transform = `rotate(${secDeg}deg)`;
+      minuteHand.style.transform = `rotate(${minDeg}deg)`;
+      hourHand.style.transform = `rotate(${hrDeg}deg)`;
+
+      updateDate();
+      animationFrame = requestAnimationFrame(runClock);
+    }
+
+    // 3D Tilt Effect on Mouse Move
+    document.addEventListener('mousemove', (e) => {
+      const { innerWidth, innerHeight } = window;
+      const x = (e.clientX - innerWidth / 2) / (innerWidth / 2);
+      const y = (e.clientY - innerHeight / 2) / (innerHeight / 2);
+
+      // Rotate container slightly
+      container.style.transform = `perspective(1000px) rotateY(${x * 15}deg) rotateX(${-y * 15}deg)`;
+      
+      // Move glare opposite to mouse
+      const glareX = -x * 100; 
+      const glareY = -y * 100;
+      glare.style.transform = `translate(${glareX}px, ${glareY}px)`;
+    });
+
+    // Initialize
+    initClockFace();
+    updateDate();
+    setTime(10, 10); // Set to requested time
+
+    // Reveal text
+    setTimeout(() => {
+      footerText.classList.remove('opacity-0');
+    }, 500);
+
+  </script>
+
+</body>
+</html>

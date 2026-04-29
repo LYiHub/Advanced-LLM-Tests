@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Motion Design Sequence</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: #ffffff;
+        }
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+            }
+        }
+    </script>
+    <script type="module">
+        import * as THREE from 'three';
+
+        // --- 基础场景设置 ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x000000);
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+        camera.position.set(0, 0, 6);
+        camera.lookAt(0, 0, 0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        document.body.appendChild(renderer.domElement);
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // --- 工具函数 ---
+        const lerp = (a, b, t) => a + (b - a) * t;
+        const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
+        const easeInCubic = (t) => t * t * t;
+        const easeInOutCubic = (t) => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+
+        function createLineMaterial() {
+            return new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1 });
+        }
+
+        // --- 阶段 0-1s: 起源/ORIGIN ---
+        const originGroup = new THREE.Group();
+        scene.add(originGroup);
+
+        const dotGeo = new THREE.CircleGeometry(0.03, 32);
+        const dotMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, side: THREE.DoubleSide });
+        const dot = new THREE.Mesh(dotGeo, dotMat);
+        originGroup.add(dot);
+
+        const ripples = [];
+        for (let i = 0; i < 3; i++) {
+            const rippleGeo = new THREE.RingGeometry(0.05, 0.07, 64);
+            const rippleMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, side: THREE.DoubleSide });
+            const ripple = new THREE.Mesh(rippleGeo, rippleMat);
+            ripple.userData.delay = i * 0.2;
+            ripples.push(ripple);
+            originGroup.add(ripple);
+        }
+
+        // --- 阶段 2-4s: 网格→圆/GRID → CIRCLE ---
+        const gridGroup = new THREE.Group();
+        scene.add(gridGroup);
+        gridGroup.visible = false;
+
+        const gridLines = [];
+        const gridPoints = 100;
+        for (let i = 0; i < 18; i++) {
+            const positions = new Float32Array(gridPoints * 3);
+            const geo = new THREE.BufferGeometry();
+            geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            const line = new THREE.Line(geo, createLineMaterial());
+            line.userData.isHorizontal = i < 9;
+            line.userData.index = i < 9 ? i : i - 9;
+            gridLines.push(line);
+            gridGroup.add(line);
+        }
+
+        // --- 阶段 4-6s: 线框→实体球/WIREFRAME → SOLID SPHERE ---
+        const sphereGroup = new THREE.Group();
+        scene.add(sphereGroup);
+        sphereGroup.visible = false;
+
+        const wireGeo = new THREE.SphereGeometry(1.5, 18, 9);
+        const wireMat = new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true, transparent: true, opacity: 0 });
+        const wireSphere = new THREE.Mesh(wireGeo, wireMat);
+        sphereGroup.add(wireSphere);
+
+        const solidGeo = new THREE.SphereGeometry(1.5, 32, 32);
+        const solidMat = new THREE.MeshPhongMaterial({ color: 0xffffff, emissive: 0x222222, specular: 0xffffff, shininess: 30, transparent: true, opacity: 0 });
+        const solidSphere = new THREE.Mesh(solidGeo, solidMat);
+        sphereGroup.add(solidSphere);
+
+        const pointLight = new THREE.PointLight(0xffffff, 0, 10);
+        pointLight.position.set(-2, 2, 3);
+        scene.add(pointLight);
+        const ambientLight = new THREE.AmbientLight(0x111111);
+        scene.add(ambientLight);
+
+        // --- 阶段 6-8s: 界面/INTERFACE ---
+        const phoneGroup = new THREE.Group();
+        scene.add(phoneGroup);
+        phoneGroup.visible = false;
+
+        const uiCanvas = document.createElement('canvas');
+        uiCanvas.width = 512; uiCanvas.height = 1024;
+        const ctx = uiCanvas.getContext('2d');
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(0, 0, 512, 1024);
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        
+        // 状态栏
+        ctx.strokeRect(30, 40, 30, 10);
+        ctx.strokeRect(452, 40, 30, 10);
+        ctx.beginPath(); ctx.moveTo(230, 45); ctx.lineTo(280, 45); ctx.stroke();
+
+        // 图标网格
+        for (let i = 0; i < 4; i++) {
+            for (let j = 0; j < 6; j++) {
+                const x = 50 + i * 115;
+                const y = 140 + j * 130;
+                ctx.beginPath();
+                ctx.roundRect(x, y, 70, 70, 15);
+                ctx.stroke();
+            }
+        }
+
+        // Home indicator
+        ctx.beginPath();
+        ctx.roundRect(180, 960, 150, 8, 4);
+        ctx.stroke();
+
+        const uiTexture = new THREE.CanvasTexture(uiCanvas);
+        const phoneGeo = new THREE.PlaneGeometry(1.5, 3);
+        const phoneMat = new THREE.MeshBasicMaterial({ map: uiTexture, transparent: true, opacity: 0 });
+        const phoneMesh = new THREE.Mesh(phoneGeo, phoneMat);
+        phoneGroup.add(phoneMesh);
+
+        // --- 阶段 8-10s: 立方体→绽放/CUBE → BLOOM ---
+        const cubeGroup = new THREE.Group();
+        scene.add(cubeGroup);
+        cubeGroup.visible = false;
+
+        const cubeWireGeo = new THREE.BoxGeometry(1.8, 1.8, 1.8);
+        const cubeWireMat = new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true, transparent: true, opacity: 0 });
+        const cubeWire = new THREE.Mesh(cubeWireGeo, cubeWireMat);
+        cubeGroup.add(cubeWire);
+
+        const petals = [];
+        const petalGeo = new THREE.CircleGeometry(0.9, 32);
+        // 将圆形挤压成椭圆花瓣
+        const petalPos = petalGeo.attributes.position;
+        for(let i=0; i<petalPos.count; i++) {
+            petalPos.setY(i, petalPos.getY(i) * 1.8);
+        }
+        
+        const faceData = [
+            { pos: [0, 0, 0.9], rot: [0, 0, 0] },
+            { pos: [0, 0, -0.9], rot: [0, Math.PI, 0] },
+            { pos: [0.9, 0, 0], rot: [0, Math.PI/2, 0] },
+            { pos: [-0.9, 0, 0], rot: [0, -Math.PI/2, 0] },
+            { pos: [0, 0.9, 0], rot: [-Math.PI/2, 0, 0] },
+            { pos: [0, -0.9, 0], rot: [Math.PI/2, 0, 0] }
+        ];
+
+        faceData.forEach(d => {
+            const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, side: THREE.DoubleSide });
+            const petal = new THREE.Mesh(petalGeo, mat);
+            petal.position.set(...d.pos);
+            petal.rotation.set(...d.rot);
+            petal.userData = { basePos: new THREE.Vector3(...d.pos), baseRot: new THREE.Euler(...d.rot) };
+            petals.push(petal);
+            cubeGroup.add(petal);
+        });
+
+        // --- 阶段 10-14s: 粒子阶段 ---
+        const numParticles = 1500;
+        const particlesGeo = new THREE.BufferGeometry();
+        const pPositions = new Float32Array(numParticles * 3);
+        const pTargetPositions = new Float32Array(numParticles * 3);
+        const pSizes = new Float32Array(numParticles);
+        const pPhases = new Float32Array(numParticles);
+        const pData = []; // 存储涡流参数
+
+        function getWatchTargets() {
+            const targets = [];
+            const w = 1.0, h = 1.3, lug_w = 0.3, lug_h = 0.2;
+            for(let i=0; i<numParticles; i++) {
+                let r = Math.random();
+                let x, y;
+                if (r < 2*w / (2*w+2*h)) {
+                    x = (Math.random() - 0.5) * 2 * w;
+                    y = (r < w / (2*w+2*h)) ? h : -h;
+                } else {
+                    y = (Math.random() - 0.5) * 2 * h;
+                    x = (r < (2*w+h) / (2*w+2*h)) ? w : -w;
+                }
+                if (Math.random() < 0.1) { // 表耳
+                    let x_off = (Math.random() > 0.5) ? 0.4 : -0.4;
+                    x = (Math.random() - 0.5) * lug_w + x_off;
+                    y = (Math.random() > 0.5) ? h + Math.random()*lug_h : -h - Math.random()*lug_h;
+                }
+                targets.push(x, y, 0);
+            }
+            return targets;
+        }
+
+        const watchTargets = getWatchTargets();
+        const sphereTargets = new Float32Array(numParticles * 3);
+        const ribbonTargets = new Float32Array(numParticles * 3);
+
+        for(let i=0; i<numParticles; i++) {
+            // 涡流数据
+            pData.push({
+                baseAngle: Math.random() * Math.PI * 2,
+                radius: 0.5 + Math.random() * 1.5,
+                speed: (Math.random() > 0.5 ? 1 : -1) * (0.5 + Math.random() * 1.5)
+            });
+            pPhases[i] = Math.random() * Math.PI * 2;
+            pSizes[i] = 2.0 + Math.random() * 2.0;
+
+            // 球面目标
+            let theta = Math.random() * Math.PI * 2;
+            let phi = Math.acos(2 * Math.random() - 1);
+            sphereTargets[i*3] = Math.sin(phi) * Math.cos(theta) * 1.2;
+            sphereTargets[i*3+1] = Math.sin(phi) * Math.sin(theta) * 1.2;
+            sphereTargets[i*3+2] = Math.cos(phi) * 1.2;
+
+            // 缎带目标
+            let t = (i / numParticles) * Math.PI * 6;
+            let rr = 1.5 - (i / numParticles) * 1.0;
+            ribbonTargets[i*3] = Math.cos(t) * rr;
+            ribbonTargets[i*3+1] = Math.sin(t) * rr;
+            ribbonTargets[i*3+2] = (i / numParticles - 0.5) * 2;
+
+            pPositions[i*3] = 0;
+            pPositions[i*3+1] = 0;
+            pPositions[i*3+2] = 0;
+        }
+
+        particlesGeo.setAttribute('position', new THREE.BufferAttribute(pPositions, 3));
+        particlesGeo.setAttribute('aSize', new THREE.BufferAttribute(pSizes, 1));
+        particlesGeo.setAttribute('aPhase', new THREE.BufferAttribute(pPhases, 1));
+
+        const particleVert = `
+            attribute float aSize;
+            attribute float aPhase;
+            varying float vAlpha;
+            uniform float uTime;
+            uniform float uOpacity;
+            uniform float uPulse;
+            void main() {
+                float flicker = 0.7 + 0.3 * sin(uTime * 5.0 + aPhase);
+                vAlpha = flicker * uOpacity;
+                vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+                gl_PointSize = aSize * (1.0 + uPulse) * (300.0 / -mvPosition.z);
+                gl_Position = projectionMatrix * mvPosition;
+            }
+        `;
+        const particleFrag = `
+            varying float vAlpha;
+            void main() {
+                float dist = length(gl_PointCoord - vec2(0.5));
+                if (dist > 0.5) discard;
+                float alpha = smoothstep(0.5, 0.2, dist) * vAlpha;
+                gl_FragColor = vec4(1.0, 1.0, 1.0, alpha);
+            }
+        `;
+
+        const particleMat = new THREE.ShaderMaterial({
+            uniforms: {
+                uTime: { value: 0 },
+                uOpacity: { value: 0 },
+                uPulse: { value: 0 }
+            },
+            vertexShader: particleVert,
+            fragmentShader: particleFrag,
+            transparent: true,
+            depthWrite: false
+        });
+
+        const particleSystem = new THREE.Points(particlesGeo, particleMat);
+        particleSystem.visible = false;
+        scene.add(particleSystem);
+
+        // --- 阶段 14-15s: LOGO/标志 ---
+        const logoGroup = new THREE.Group();
+        scene.add(logoGroup);
+        logoGroup.visible = false;
+
+        const logoCanvas = document.createElement('canvas');
+        logoCanvas.width = 512; logoCanvas.height = 128;
+        const lCtx = logoCanvas.getContext('2d');
+        lCtx.fillStyle = '#000000';
+        lCtx.fillRect(0,0,512,128);
+        lCtx.fillStyle = '#ffffff';
+        lCtx.font = 'bold 60px Helvetica, sans-serif';
+        lCtx.textAlign = 'center';
+        lCtx.textBaseline = 'middle';
+        lCtx.fillText('AETHER', 256, 64);
+        const logoTexture = new THREE.CanvasTexture(logoCanvas);
+        const logoGeo = new THREE.PlaneGeometry(2.5, 0.625);
+        const logoMat = new THREE.MeshBasicMaterial({ map: logoTexture, transparent: true, opacity: 0 });
+        const logoMesh = new THREE.Mesh(logoGeo, logoMat);
+        logoGroup.add(logoMesh);
+
+        const glowCanvas = document.createElement('canvas');
+        glowCanvas.width = 256; glowCanvas.height = 256;
+        const gCtx = glowCanvas.getContext('2d');
+        const gradient = gCtx.createRadialGradient(128, 128, 0, 128, 128, 128);
+        gradient.addColorStop(0, 'rgba(255, 191, 0, 1)');
+        gradient.addColorStop(0.4, 'rgba(255, 191, 0, 0.4)');
+        gradient.addColorStop(1, 'rgba(255, 191, 0, 0)');
+        gCtx.fillStyle = gradient;
+        gCtx.fillRect(0,0,256,256);
+        const glowTexture = new THREE.CanvasTexture(glowCanvas);
+        const glowMat = new THREE.SpriteMaterial({ map: glowTexture, transparent: true, opacity: 0, blending: THREE.AdditiveBlending });
+        const glowSprite = new THREE.Sprite(glowMat);
+        glowSprite.scale.set(4, 4, 1);
+        glowSprite.position.z = -0.1;
+        logoGroup.add(glowSprite);
+
+        // --- 主循环 ---
+        const clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const T = clock.getElapsedTime();
+            
+            // 辅助函数：计算阶段进度 p (0~1)
+            const getP = (start, end) => Math.max(0, Math.min(1, (T - start) / (end - start)));
+
+            // 0-1s ORIGIN
+            if (T < 2) {
+                let p = getP(0, 1);
+                dotMat.opacity = T < 1.5 ? 1 : Math.max(0, 1 - getP(1.5, 2));
+                let dotScale = 1 + 0.5 * Math.sin(p * Math.PI); // 脉动
+                dot.scale.set(dotScale, dotScale, 1);
+
+                ripples.forEach((r, i) => {
+                    let rp = getP(r.userData.delay, r.userData.delay + 0.8);
+                    r.material.opacity = 1 - rp;
+                    let s = 1 + rp * 5;
+                    r.scale.set(s, s, 1);
+                });
+            } else {
+                dotMat.opacity = 0;
+                ripples.forEach(r => r.material.opacity = 0);
+            }
+
+            // 1-2s LINE
+            if (T >= 1 && T < 2.5) {
+                let p = easeOutCubic(getP(1, 2));
+                dot.scale.set(p * 40, 0.05, 1); // 拉伸成线
+                dotMat.opacity = T < 2 ? 1 : (1 - getP(2, 2.5));
+            }
+
+            // 2-4s GRID -> CIRCLE
+            if (T >= 1.5 && T < 4.5) {
+                gridGroup.visible = true;
+                let growP = easeOutCubic(getP(2, 3));
+                let morphP = easeInOutCubic(getP(3, 4));
+                let fadeP = 1 - getP(4, 4.5);
+                
+                gridGroup.rotation.z = morphP * Math.PI / 4;
+                gridGroup.children.forEach(line => line.material.opacity = fadeP);
+
+                gridLines.forEach(line => {
+                    const pos = line.geometry.attributes.position;
+                    const isH = line.userData.isHorizontal;
+                    const idx = line.userData.index;
+                    
+                    for(let i=0; i<gridPoints; i++) {
+                        let t = (i/(gridPoints-1) - 0.5) * 2; // -1 to 1
+                        let x, y, tx, ty;
+
+                        if(isH) {
+                            x = t * 1.8;
+                            y = (idx - 4) * 0.4;
+                            // 目标：同心圆弧
+                            let angle = (x / 1.8) * Math.PI * 0.95;
+                            let radius = (Math.abs(y) / 1.6) * 1.5 + 0.1;
+                            tx = Math.cos(angle) * radius;
+                            ty = Math.sin(angle) * radius;
+                        } else {
+                            y = t * 1.6;
+                            x = (idx - 4) * 0.4;
+                            let angle = (y / 1.6) * Math.PI * 0.95;
+                            let radius = (Math.abs(x) / 1.8) * 1.5 + 0.1;
+                            tx = Math.cos(angle) * radius;
+                            ty = Math.sin(angle) * radius;
+                        }
+
+                        let currentX = x * growP;
+                        let currentY = y * growP;
+
+                        pos.setX(i, lerp(currentX, tx, morphP));
+                        pos.setY(i, lerp(currentY, ty, morphP));
+                        pos.setZ(i, 0);
+                    }
+                    pos.needsUpdate = true;
+                });
+            } else {
+                gridGroup.visible = false;
+            }
+
+            // 4-6s WIREFRAME -> SOLID SPHERE
+            if (T >= 4 && T < 7) {
+                sphereGroup.visible = true;
+                let inflateP = easeOutCubic(getP(4, 5));
+                let solidP = getP(5, 6);
+                let fadeP = 1 - getP(6.5, 7);
+
+                wireSphere.scale.set(1, 1, inflateP); // 挤出3D
+                wireSphere.rotation.y = T * 0.5;
+                wireMat.opacity = fadeP;
+
+                solidMat.opacity = solidP * fadeP;
+                pointLight.intensity = solidP * 1.5;
+            } else {
+                sphereGroup.visible = false;
+            }
+
+            // 6-8s INTERFACE
+            if (T >= 6 && T < 8.5) {
+                phoneGroup.visible = true;
+                let morphP = easeInOutCubic(getP(6, 7));
+                let fadeP = 1 - getP(8, 8.5);
+                
+                // 球体扁平化替换为手机
+                solidSphere.scale.set(lerp(1, 1.5, morphP), lerp(1, 2.5, morphP), lerp(1, 0.01, morphP));
+                solidSphere.rotation.y = 0;
+                solidMat.opacity = fadeP;
+                sphereGroup.visible = true;
+
+                phoneMat.opacity = getP(6.5, 7) * fadeP;
+            } else {
+                phoneGroup.visible = false;
+                if(T >= 8.5) sphereGroup.visible = false;
+            }
+
+            // 8-10s CUBE -> BLOOM
+            if (T >= 8 && T < 10.5) {
+                cubeGroup.visible = true;
+                let cubeP = getP(8, 9);
+                let bloomP = easeOutCubic(getP(9, 10));
+                let fadeP = 1 - getP(10, 10.5);
+
+                // 立方体翻转
+                cubeWire.rotation.x = cubeP * Math.PI * 2;
+                cubeWire.rotation.y = cubeP * Math.PI;
+                cubeWireMat.opacity = (1 - bloomP) * fadeP;
+
+                // 花瓣绽放
+                petals.forEach(petal => {
+                    let bp = bloomP;
+                    let baseP = petal.userData.basePos;
+                    let baseR = petal.userData.baseRot;
+                    
+                    // 向外位移并旋转展开
+                    petal.position.copy(baseP).multiplyScalar(1 + bp * 1.5);
+                    petal.rotation.x = baseR.x + bp * Math.sign(baseR.x + 0.1) * Math.PI / 2;
+                    petal.rotation.y = baseR.y + bp * Math.sign(baseR.y + 0.1) * Math.PI / 2;
+                    petal.material.opacity = fadeP * (bloomP > 0 ? 1 : 0);
+                });
+            } else {
+                cubeGroup.visible = false;
+            }
+
+            // 10-14s PARTICLES
+            if (T >= 10 && T < 15) {
+                particleSystem.visible = true;
+                let pOpacity = 1;
+                if (T < 10.5) pOpacity = getP(10, 10.5);
+                if (T > 14) pOpacity = 1 - getP(14, 14.3);
+
+                particleMat.uniforms.uOpacity.value = pOpacity;
+                particleMat.uniforms.uTime.value = T;
+
+                const pos = particlesGeo.attributes.position;
+                let pulse = 0;
+                
+                // 12-13s VORTEX -> WATCH
+                if (T >= 10 && T < 12.5) {
+                    let watchP = easeInOutCubic(getP(12, 13));
+                    for(let i=0; i<numParticles; i++) {
+                        // 涡流
+                        let d = pData[i];
+                        let angle = d.baseAngle + (T - 10) * d.speed;
+                        let vx = Math.cos(angle) * d.radius;
+                        let vy = Math.sin(angle) * d.radius * 0.6;
+                        let vz = Math.sin(angle + d.baseAngle) * 0.5;
+
+                        // 手表
+                        let wx = watchTargets[i*3];
+                        let wy = watchTargets[i*3+1];
+                        let wz = watchTargets[i*3+2];
+
+                        pos.setX(i, lerp(vx, wx, watchP));
+                        pos.setY(i, lerp(vy, wy, watchP));
+                        pos.setZ(i, lerp(vz, wz, watchP));
+                    }
+                } 
+                // 13-14s WATCH -> RIBBON -> SPHERE -> COLLAPSE
+                else if (T >= 12.5 && T < 14.5) {
+                    let ribbonP = easeInOutCubic(getP(12.5, 13.2));
+                    let sphereP = easeInOutCubic(getP(13.2, 13.7));
+                    let collapseP = easeInCubic(getP(13.7, 14.2));
+                    
+                    // 脉动
+                    if(T > 13.5 && T < 14) {
+                        pulse = Math.sin((T - 13.5) * Math.PI * 2) * 0.5;
+                    }
+
+                    for(let i=0; i<numParticles; i++) {
+                        let wx = watchTargets[i*3], wy = watchTargets[i*3+1], wz = watchTargets[i*3+2];
+                        let rx = ribbonTargets[i*3], ry = ribbonTargets[i*3+1], rz = ribbonTargets[i*3+2];
+                        let sx = sphereTargets[i*3], sy = sphereTargets[i*3+1], sz = sphereTargets[i*3+2];
+                        
+                        // 混合步骤
+                        let x1 = lerp(wx, rx, ribbonP);
+                        let y1 = lerp(wy, ry, ribbonP);
+                        let z1 = lerp(wz, rz, ribbonP);
+
+                        let x2 = lerp(x1, sx, sphereP);
+                        let y2 = lerp(y1, sy, sphereP);
+                        let z2 = lerp(z1, sz, sphereP);
+
+                        // 坍缩
+                        pos.setX(i, lerp(x2, 0, collapseP));
+                        pos.setY(i, lerp(y2, 0, collapseP));
+                        pos.setZ(i, lerp(z2, 0, collapseP));
+                    }
+                } else if (T >= 14.2) {
+                    // 保持中心点
+                    for(let i=0; i<numParticles; i++) {
+                        pos.setX(i, 0); pos.setY(i, 0); pos.setZ(i, 0);
+                    }
+                }
+
+                particleMat.uniforms.uPulse.value = pulse;
+                pos.needsUpdate = true;
+            } else {
+                particleSystem.visible = false;
+            }
+
+            // 14-15s LOGO
+            if (T >= 14 && T < 16) {
+                logoGroup.visible = true;
+                let logoP = easeOutCubic(getP(14.3, 15));
+                logoMat.opacity = logoP;
+                logoMesh.scale.set(logoP, logoP, 1);
+
+                // 琥珀色光芒脉冲
+                if (T > 14.5) {
+                    let glowP = getP(14.5, 15.5);
+                    glowMat.opacity = Math.sin(glowP * Math.PI) * 0.8;
+                    glowSprite.scale.set(2 + glowP * 3, 2 + glowP * 3, 1);
+                }
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        animate();
+    </script>
+</body>
+</html>

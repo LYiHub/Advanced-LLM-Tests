@@ -1,0 +1,1205 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FlowMind - 液态智能，无限流动</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-deep: #080d18;
+            --glass-bg: rgba(12, 20, 40, 0.25);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --glass-highlight: rgba(255, 255, 255, 0.14);
+            --text-primary: rgba(255, 255, 255, 0.92);
+            --text-secondary: rgba(255, 255, 255, 0.6);
+            --text-tertiary: rgba(255, 255, 255, 0.38);
+            --accent-deep: #1a3a6a;
+            --accent-mid: #1e5090;
+            --accent-light: #3a7cc5;
+            --glow-soft: rgba(30, 80, 160, 0.3);
+            --glow-bright: rgba(60, 130, 220, 0.5);
+            --shadow-refract-warm: rgba(180, 140, 100, 0.08);
+            --shadow-refract-cool: rgba(80, 140, 200, 0.1);
+            --font-display: 'Playfair Display', 'Georgia', 'Times New Roman', serif;
+            --font-body: 'Inter', 'Helvetica Neue', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            --nav-height: 64px;
+            --card-blur: 18px;
+            --card-saturate: 160%;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            background: var(--bg-deep);
+            font-family: var(--font-body);
+            color: var(--text-primary);
+            overflow-x: hidden;
+            min-height: 100vh;
+            cursor: crosshair;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            position: relative;
+        }
+
+        /* Canvas Background Layer */
+        #fluidCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        /* Global Mouse Glow */
+        .mouse-glow {
+            position: fixed;
+            pointer-events: none;
+            z-index: 1;
+            width: 320px;
+            height: 320px;
+            border-radius: 50%;
+            background: radial-gradient(circle at center,
+                    rgba(40, 90, 180, 0.12) 0%,
+                    rgba(30, 60, 140, 0.05) 30%,
+                    rgba(15, 30, 70, 0.02) 55%,
+                    transparent 70%);
+            transform: translate(-50%, -50%);
+            transition: opacity 0.4s ease;
+            will-change: left, top;
+        }
+
+        /* Navigation */
+        .nav-container {
+            position: fixed;
+            top: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            width: calc(100% - 40px);
+            max-width: 1280px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 28px;
+            background: rgba(10, 18, 34, 0.55);
+            backdrop-filter: blur(24px) saturate(140%);
+            -webkit-backdrop-filter: blur(24px) saturate(140%);
+            border: 1px solid rgba(255, 255, 255, 0.07);
+            border-radius: 20px;
+            box-shadow:
+                0 8px 40px rgba(0, 0, 0, 0.5),
+                0 1px 0 rgba(255, 255, 255, 0.04) inset,
+                0 -1px 0 rgba(255, 255, 255, 0.02) inset,
+                0 0 0 1px rgba(255, 255, 255, 0.03);
+            transition: all 0.5s cubic-bezier(0.22, 0.61, 0.36, 1);
+        }
+
+        .nav-container.scrolled {
+            background: rgba(10, 18, 34, 0.7);
+            backdrop-filter: blur(28px) saturate(150%);
+            -webkit-backdrop-filter: blur(28px) saturate(150%);
+            box-shadow:
+                0 12px 50px rgba(0, 0, 0, 0.6),
+                0 1px 0 rgba(255, 255, 255, 0.05) inset,
+                0 0 30px rgba(30, 70, 140, 0.08);
+        }
+
+        .nav-logo {
+            font-family: var(--font-display);
+            font-size: 1.6rem;
+            font-weight: 600;
+            letter-spacing: -0.02em;
+            color: var(--text-primary);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            position: relative;
+        }
+
+        .nav-logo-dot {
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: var(--accent-light);
+            box-shadow: 0 0 18px var(--glow-bright), 0 0 40px var(--glow-soft);
+            animation: logoDotPulse 3s ease-in-out infinite;
+        }
+
+        @keyframes logoDotPulse {
+            0%,
+            100% {
+                box-shadow: 0 0 18px var(--glow-bright), 0 0 40px var(--glow-soft);
+                transform: scale(1);
+            }
+            50% {
+                box-shadow: 0 0 28px rgba(80, 160, 240, 0.7), 0 0 55px rgba(40, 100, 200, 0.45);
+                transform: scale(1.3);
+            }
+        }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 32px;
+            list-style: none;
+        }
+
+        .nav-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 450;
+            letter-spacing: 0.01em;
+            transition: all 0.35s ease;
+            position: relative;
+            padding: 4px 0;
+        }
+
+        .nav-links a::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            width: 0;
+            height: 1.5px;
+            background: var(--accent-light);
+            border-radius: 2px;
+            transition: width 0.35s cubic-bezier(0.22, 0.61, 0.36, 1);
+            box-shadow: 0 0 8px var(--glow-bright);
+        }
+
+        .nav-links a:hover {
+            color: var(--text-primary);
+        }
+        .nav-links a:hover::after {
+            width: 100%;
+        }
+
+        .nav-cta {
+            padding: 10px 22px;
+            border-radius: 30px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: var(--text-primary);
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.4s cubic-bezier(0.22, 0.61, 0.36, 1);
+            text-decoration: none;
+            letter-spacing: 0.02em;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            white-space: nowrap;
+        }
+        .nav-cta:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.3);
+            box-shadow: 0 0 30px rgba(50, 110, 200, 0.25), 0 0 60px rgba(30, 70, 150, 0.12);
+            transform: translateY(-1px);
+        }
+
+        /* Main Content Wrapper */
+        .content-wrapper {
+            position: relative;
+            z-index: 10;
+            pointer-events: auto;
+        }
+
+        /* Hero Section */
+        .hero-section {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 120px 40px 80px;
+            position: relative;
+        }
+
+        .hero-inner {
+            max-width: 900px;
+            text-align: center;
+            position: relative;
+        }
+
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 18px;
+            border-radius: 30px;
+            background: rgba(20, 40, 75, 0.35);
+            backdrop-filter: blur(16px) saturate(150%);
+            -webkit-backdrop-filter: blur(16px) saturate(150%);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            font-size: 0.8rem;
+            font-weight: 500;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+            margin-bottom: 32px;
+            box-shadow:
+                0 4px 20px rgba(0, 0, 0, 0.3),
+                0 1px 0 rgba(255, 255, 255, 0.03) inset;
+        }
+        .hero-badge-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #4ade80;
+            box-shadow: 0 0 10px rgba(74, 222, 128, 0.6);
+            animation: logoDotPulse 2.5s ease-in-out infinite;
+        }
+
+        .hero-title {
+            font-family: var(--font-display);
+            font-size: clamp(3.2rem, 6.5vw, 5.6rem);
+            font-weight: 600;
+            line-height: 1.08;
+            letter-spacing: -0.03em;
+            color: var(--text-primary);
+            margin-bottom: 24px;
+            text-shadow: 0 0 80px rgba(40, 90, 180, 0.25);
+        }
+        .hero-title .accent-word {
+            background: linear-gradient(135deg, #c8ddf8 0%, #8ab8e8 30%, #d0e4f7 60%, #a0c8f0 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            position: relative;
+        }
+
+        .hero-subtitle {
+            font-size: 1.2rem;
+            font-weight: 400;
+            color: var(--text-secondary);
+            line-height: 1.7;
+            max-width: 600px;
+            margin: 0 auto 44px;
+            letter-spacing: 0.01em;
+        }
+
+        .hero-actions {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn-primary {
+            padding: 15px 36px;
+            border-radius: 40px;
+            background: rgba(30, 65, 120, 0.5);
+            backdrop-filter: blur(14px) saturate(160%);
+            -webkit-backdrop-filter: blur(14px) saturate(160%);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #fff;
+            font-size: 1rem;
+            font-weight: 550;
+            cursor: pointer;
+            letter-spacing: 0.03em;
+            transition: all 0.45s cubic-bezier(0.22, 0.61, 0.36, 1);
+            text-decoration: none;
+            box-shadow:
+                0 8px 30px rgba(0, 0, 0, 0.35),
+                0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+                0 0 60px rgba(30, 70, 150, 0.2);
+            position: relative;
+            overflow: hidden;
+        }
+        .btn-primary::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle at center, rgba(255, 255, 255, 0.15) 0%, transparent 60%);
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+        .btn-primary:hover {
+            background: rgba(40, 85, 155, 0.55);
+            border-color: rgba(255, 255, 255, 0.35);
+            box-shadow:
+                0 12px 40px rgba(0, 0, 0, 0.4),
+                0 0 0 1px rgba(255, 255, 255, 0.06) inset,
+                0 0 80px rgba(40, 100, 200, 0.35);
+            transform: translateY(-2px);
+        }
+        .btn-primary:hover::before {
+            opacity: 1;
+        }
+
+        .btn-secondary {
+            padding: 15px 36px;
+            border-radius: 40px;
+            background: rgba(255, 255, 255, 0.02);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--text-primary);
+            font-size: 1rem;
+            font-weight: 450;
+            cursor: pointer;
+            letter-spacing: 0.03em;
+            transition: all 0.4s cubic-bezier(0.22, 0.61, 0.36, 1);
+            text-decoration: none;
+        }
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.06);
+            border-color: rgba(255, 255, 255, 0.22);
+            box-shadow: 0 0 30px rgba(50, 100, 180, 0.15);
+            transform: translateY(-1px);
+        }
+
+        /* Features Section */
+        .features-section {
+            padding: 80px 40px 120px;
+            position: relative;
+        }
+
+        .section-label {
+            text-align: center;
+            font-size: 0.78rem;
+            font-weight: 500;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-tertiary);
+            margin-bottom: 16px;
+        }
+
+        .section-title {
+            text-align: center;
+            font-family: var(--font-display);
+            font-size: clamp(2rem, 3.5vw, 2.8rem);
+            font-weight: 600;
+            letter-spacing: -0.02em;
+            color: var(--text-primary);
+            margin-bottom: 56px;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .feature-card {
+            position: relative;
+            padding: 36px 28px 32px;
+            border-radius: 22px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(var(--card-blur)) saturate(var(--card-saturate));
+            -webkit-backdrop-filter: blur(var(--card-blur)) saturate(var(--card-saturate));
+            border: 1px solid var(--glass-border);
+            transition: all 0.5s cubic-bezier(0.22, 0.61, 0.36, 1);
+            cursor: default;
+            box-shadow:
+                0 10px 40px rgba(0, 0, 0, 0.35),
+                0 1px 0 rgba(255, 255, 255, 0.03) inset,
+                0 0 0 1px rgba(255, 255, 255, 0.02);
+            overflow: visible;
+            z-index: 1;
+        }
+
+        .feature-card::before {
+            content: '';
+            position: absolute;
+            inset: -1px;
+            border-radius: 23px;
+            padding: 1px;
+            background: linear-gradient(135deg,
+                    rgba(255, 255, 255, 0.12) 0%,
+                    rgba(255, 255, 255, 0.03) 25%,
+                    rgba(255, 255, 255, 0.01) 50%,
+                    rgba(255, 255, 255, 0.06) 75%,
+                    rgba(255, 255, 255, 0.1) 100%);
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            pointer-events: none;
+            z-index: -1;
+            opacity: 0.7;
+            transition: opacity 0.5s ease;
+        }
+
+        .feature-card::after {
+            content: '';
+            position: absolute;
+            inset: 20px -10px -10px 20px;
+            border-radius: 30px;
+            background: transparent;
+            box-shadow:
+                var(--shadow-refract-warm) 0px -3px 12px -2px,
+                var(--shadow-refract-cool) 0px 3px 12px -2px,
+                rgba(100, 160, 220, 0.04) 3px 0px 10px -2px,
+                rgba(180, 140, 100, 0.03) -3px 0px 10px -2px;
+            pointer-events: none;
+            z-index: -2;
+            transition: all 0.5s cubic-bezier(0.22, 0.61, 0.36, 1);
+        }
+
+        .feature-card:hover {
+            background: rgba(18, 30, 55, 0.4);
+            backdrop-filter: blur(22px) saturate(180%);
+            -webkit-backdrop-filter: blur(22px) saturate(180%);
+            border-color: rgba(255, 255, 255, 0.15);
+            box-shadow:
+                0 20px 55px rgba(0, 0, 0, 0.5),
+                0 2px 0 rgba(255, 255, 255, 0.06) inset,
+                0 0 80px rgba(30, 70, 150, 0.2),
+                0 0 0 1px rgba(255, 255, 255, 0.04);
+            transform: translateY(-6px);
+            z-index: 5;
+        }
+        .feature-card:hover::before {
+            opacity: 1;
+        }
+        .feature-card:hover::after {
+            box-shadow:
+                var(--shadow-refract-warm) 0px -5px 18px -3px,
+                var(--shadow-refract-cool) 0px 5px 18px -3px,
+                rgba(120, 180, 230, 0.07) 5px 0px 14px -3px,
+                rgba(190, 150, 110, 0.05) -5px 0px 14px -3px;
+        }
+
+        .feature-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            background: rgba(20, 45, 80, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 0 20px rgba(30, 70, 140, 0.2);
+            position: relative;
+            transition: all 0.4s ease;
+        }
+        .feature-card:hover .feature-icon {
+            box-shadow: 0 0 35px rgba(40, 100, 200, 0.4);
+            border-color: rgba(255, 255, 255, 0.18);
+        }
+
+        .feature-card h3 {
+            font-size: 1.15rem;
+            font-weight: 600;
+            letter-spacing: -0.01em;
+            margin-bottom: 10px;
+            color: var(--text-primary);
+        }
+        .feature-card p {
+            font-size: 0.9rem;
+            font-weight: 400;
+            color: var(--text-secondary);
+            line-height: 1.6;
+            letter-spacing: 0.01em;
+        }
+
+        /* Stats / Metrics Row */
+        .metrics-row {
+            display: flex;
+            justify-content: center;
+            gap: 60px;
+            margin-top: 70px;
+            flex-wrap: wrap;
+        }
+        .metric-item {
+            text-align: center;
+            padding: 20px 28px;
+            border-radius: 16px;
+            background: rgba(15, 28, 50, 0.3);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: all 0.4s ease;
+            cursor: default;
+        }
+        .metric-item:hover {
+            border-color: rgba(255, 255, 255, 0.14);
+            box-shadow: 0 0 35px rgba(30, 70, 140, 0.18);
+            transform: translateY(-3px);
+        }
+        .metric-value {
+            font-family: var(--font-display);
+            font-size: 2.4rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            color: var(--text-primary);
+            background: linear-gradient(135deg, #e0ecf8, #b0cfe8);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .metric-label {
+            font-size: 0.8rem;
+            color: var(--text-tertiary);
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            margin-top: 6px;
+        }
+
+        /* Footer */
+        .footer-section {
+            padding: 50px 40px 40px;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            position: relative;
+            background: rgba(8, 14, 26, 0.5);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+        .footer-inner {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 24px;
+        }
+        .footer-brand {
+            font-family: var(--font-display);
+            font-size: 1.3rem;
+            font-weight: 600;
+            letter-spacing: -0.02em;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .footer-links {
+            display: flex;
+            gap: 28px;
+            flex-wrap: wrap;
+        }
+        .footer-links a {
+            color: var(--text-tertiary);
+            text-decoration: none;
+            font-size: 0.85rem;
+            transition: color 0.3s ease;
+            letter-spacing: 0.02em;
+        }
+        .footer-links a:hover {
+            color: var(--text-primary);
+        }
+        .footer-copy {
+            color: var(--text-tertiary);
+            font-size: 0.8rem;
+            letter-spacing: 0.03em;
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .features-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 16px;
+                padding: 0 20px;
+            }
+            .metrics-row {
+                gap: 30px;
+            }
+            .nav-links {
+                gap: 18px;
+            }
+            .nav-links a {
+                font-size: 0.8rem;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .features-grid {
+                grid-template-columns: 1fr;
+                gap: 14px;
+                padding: 0 12px;
+            }
+            .hero-title {
+                font-size: 2.4rem;
+            }
+            .hero-subtitle {
+                font-size: 1rem;
+            }
+            .nav-container {
+                padding: 10px 16px;
+                border-radius: 14px;
+                width: calc(100% - 24px);
+            }
+            .nav-links {
+                gap: 10px;
+            }
+            .nav-links a {
+                font-size: 0.72rem;
+            }
+            .nav-cta {
+                padding: 8px 14px;
+                font-size: 0.75rem;
+            }
+            .nav-logo {
+                font-size: 1.2rem;
+            }
+            .metrics-row {
+                gap: 16px;
+                flex-direction: column;
+                align-items: center;
+            }
+            .feature-card {
+                padding: 24px 18px 22px;
+            }
+            .footer-inner {
+                flex-direction: column;
+                text-align: center;
+            }
+            .hero-section {
+                padding: 100px 20px 60px;
+            }
+            .features-section {
+                padding: 40px 16px 80px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Canvas for fluid background -->
+    <canvas id="fluidCanvas"></canvas>
+
+    <!-- Mouse glow -->
+    <div class="mouse-glow" id="mouseGlow"></div>
+
+    <!-- Navigation -->
+    <nav class="nav-container" id="navBar">
+        <a href="#" class="nav-logo">
+            <span class="nav-logo-dot"></span> FlowMind
+        </a>
+        <ul class="nav-links">
+            <li><a href="#features">核心技术</a></li>
+            <li><a href="#">模型服务</a></li>
+            <li><a href="#">研究</a></li>
+            <li><a href="#">关于</a></li>
+        </ul>
+        <a href="#" class="nav-cta">接入平台</a>
+    </nav>
+
+    <!-- Content -->
+    <div class="content-wrapper">
+        <!-- Hero -->
+        <section class="hero-section">
+            <div class="hero-inner">
+                <div class="hero-badge">
+                    <span class="hero-badge-dot"></span> 新一代大模型架构
+                </div>
+                <h1 class="hero-title">
+                    让智能如<span class="accent-word">液态</span>般<br>无限流动
+                </h1>
+                <p class="hero-subtitle">
+                    FlowMind 以大模型为核心，构建具备深度理解与创造能力的液态智能体。我们重新定义了AI与人类协作的边界——更自然、更深远、更具适应性。
+                </p>
+                <div class="hero-actions">
+                    <a href="#" class="btn-primary">探索平台 →</a>
+                    <a href="#" class="btn-secondary">预约演示</a>
+                </div>
+            </div>
+        </section>
+
+        <!-- Features -->
+        <section class="features-section" id="features">
+            <div class="section-label">核心能力</div>
+            <h2 class="section-title">液态智能，重塑每一个维度</h2>
+            <div class="features-grid">
+                <div class="feature-card" data-card-index="0">
+                    <div class="feature-icon">🧠</div>
+                    <h3>千亿参数语言模型</h3>
+                    <p>自研深度Transformer架构，支持超长上下文理解，在逻辑推理与创意生成间取得精妙平衡。</p>
+                </div>
+                <div class="feature-card" data-card-index="1">
+                    <div class="feature-icon">👁️</div>
+                    <h3>多模态感知融合</h3>
+                    <p>统一表征空间内融合文本、图像、音频与视频，实现跨模态的深度理解与无缝生成。</p>
+                </div>
+                <div class="feature-card" data-card-index="2">
+                    <div class="feature-icon">⚡</div>
+                    <h3>实时推理引擎</h3>
+                    <p>自研推理加速框架，毫秒级响应延迟，支撑大规模并发请求，赋能关键业务场景。</p>
+                </div>
+                <div class="feature-card" data-card-index="3">
+                    <div class="feature-icon">🔐</div>
+                    <h3>企业级安全基座</h3>
+                    <p>全链路数据隔离与加密，模型行为可控可审计，满足金融级合规与隐私保护要求。</p>
+                </div>
+            </div>
+            <div class="metrics-row">
+                <div class="metric-item">
+                    <div class="metric-value">2.4T</div>
+                    <div class="metric-label">训练Token总量</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value">99.9%</div>
+                    <div class="metric-label">服务可用性</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value">200+</div>
+                    <div class="metric-label">企业客户</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value">&lt;18ms</div>
+                    <div class="metric-label">平均推理延迟</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="footer-section">
+            <div class="footer-inner">
+                <div class="footer-brand">
+                    <span class="nav-logo-dot"></span> FlowMind
+                </div>
+                <div class="footer-links">
+                    <a href="#">研发日志</a>
+                    <a href="#">开放平台</a>
+                    <a href="#">安全白皮书</a>
+                    <a href="#">加入我们</a>
+                    <a href="#">联系</a>
+                </div>
+                <div class="footer-copy">© 2025 FlowMind Inc. 保留所有权利。</div>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        (function() {
+            // ─────────────────────────────────────
+            // Canvas & Fluid Simulation
+            // ─────────────────────────────────────
+            const canvas = document.getElementById('fluidCanvas');
+            const ctx = canvas.getContext('2d');
+            let W, H, dpr;
+
+            function resizeCanvas() {
+                dpr = Math.min(window.devicePixelRatio || 1, 2);
+                W = window.innerWidth;
+                H = window.innerHeight;
+                canvas.width = W * dpr;
+                canvas.height = H * dpr;
+                canvas.style.width = W + 'px';
+                canvas.style.height = H + 'px';
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+                ctx.scale(dpr, dpr);
+            }
+            resizeCanvas();
+            window.addEventListener('resize', () => {
+                resizeCanvas();
+            });
+
+            // ─────────────────────────────────────
+            // Mouse tracking with smoothing
+            // ─────────────────────────────────────
+            const mouse = { x: W / 2, y: H / 2, tx: W / 2, ty: H / 2, isActive: false };
+            const mouseGlow = document.getElementById('mouseGlow');
+
+            document.addEventListener('mousemove', (e) => {
+                mouse.tx = e.clientX;
+                mouse.ty = e.clientY;
+                mouse.isActive = true;
+                mouseGlow.style.left = e.clientX + 'px';
+                mouseGlow.style.top = e.clientY + 'px';
+                mouseGlow.style.opacity = '1';
+            });
+            document.addEventListener('mouseleave', () => {
+                mouse.isActive = false;
+                mouseGlow.style.opacity = '0';
+            });
+            document.addEventListener('mouseenter', () => {
+                if (mouse.isActive === false && mouse.tx === W / 2) {
+                    mouse.tx = W / 2;
+                    mouse.ty = H / 2;
+                }
+                mouseGlow.style.opacity = '0.6';
+            });
+            // Touch support
+            document.addEventListener('touchmove', (e) => {
+                if (e.touches.length > 0) {
+                    mouse.tx = e.touches[0].clientX;
+                    mouse.ty = e.touches[0].clientY;
+                    mouse.isActive = true;
+                    mouseGlow.style.left = e.touches[0].clientX + 'px';
+                    mouseGlow.style.top = e.touches[0].clientY + 'px';
+                    mouseGlow.style.opacity = '1';
+                }
+            }, { passive: true });
+            document.addEventListener('touchend', () => {
+                mouse.isActive = false;
+                mouseGlow.style.opacity = '0';
+            });
+
+            // ─────────────────────────────────────
+            // Fluid Blob Class
+            // ─────────────────────────────────────
+            class FluidBlob {
+                constructor(cx, cy, baseRadius, colorBase, colorHighlight, speedPhase, complexity) {
+                    this.cx = cx;
+                    this.cy = cy;
+                    this.baseRadius = baseRadius;
+                    this.colorBase = colorBase;
+                    this.colorHighlight = colorHighlight;
+                    this.speedPhase = speedPhase;
+                    this.complexity = complexity; // number of control points
+                    this.points = [];
+                    this.timeOffset = Math.random() * Math.PI * 2;
+                    this.driftX = 0;
+                    this.driftY = 0;
+                    this.targetDriftX = 0;
+                    this.targetDriftY = 0;
+                    this.generatePoints();
+                }
+
+                generatePoints() {
+                    this.points = [];
+                    const n = this.complexity;
+                    for (let i = 0; i < n; i++) {
+                        const angle = (i / n) * Math.PI * 2;
+                        this.points.push({
+                            baseAngle: angle,
+                            amplitude: 0.5 + Math.random() * 0.5,
+                            freq1: 0.3 + Math.random() * 0.5,
+                            freq2: 0.6 + Math.random() * 0.7,
+                            freq3: 1.1 + Math.random() * 0.8,
+                            phase1: Math.random() * Math.PI * 2,
+                            phase2: Math.random() * Math.PI * 2,
+                            phase3: Math.random() * Math.PI * 2,
+                        });
+                    }
+                }
+
+                update(time, mouseInfluence) {
+                    // Smooth drift toward target
+                    this.driftX += (this.targetDriftX - this.driftX) * 0.02;
+                    this.driftY += (this.targetDriftY - this.driftY) * 0.02;
+
+                    // Update target drift based on mouse
+                    const dx = this.cx - mouse.x;
+                    const dy = this.cy - mouse.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    const influenceRadius = 500;
+                    if (mouse.isActive && dist < influenceRadius) {
+                        const strength = (1 - dist / influenceRadius) * mouseInfluence;
+                        const angle = Math.atan2(dy, dx);
+                        this.targetDriftX = Math.cos(angle) * strength * 60;
+                        this.targetDriftY = Math.sin(angle) * strength * 60;
+                    } else {
+                        this.targetDriftX *= 0.95;
+                        this.targetDriftY *= 0.95;
+                    }
+
+                    const t = time + this.timeOffset;
+                    const cxNow = this.cx + this.driftX;
+                    const cyNow = this.cy + this.driftY;
+
+                    // Update each point's actual angle offset
+                    this.points.forEach(p => {
+                        const wave1 = Math.sin(t * p.freq1 + p.phase1) * p.amplitude * 0.35;
+                        const wave2 = Math.cos(t * p.freq2 + p.phase2) * p.amplitude * 0.28;
+                        const wave3 = Math.sin(t * p.freq3 + p.phase3) * p.amplitude * 0.18;
+                        p.currentOffset = wave1 + wave2 + wave3;
+                        p.currentRadius = this.baseRadius * (1 + p.currentOffset);
+                        p.currentAngle = p.baseAngle + p.currentOffset * 0.4;
+                    });
+
+                    return { cx: cxNow, cy: cyNow };
+                }
+
+                draw(ctx, time) {
+                    const { cx, cy } = this.update(time, 0.7);
+                    const n = this.points.length;
+
+                    if (n < 3) return;
+
+                    // Build path
+                    ctx.beginPath();
+                    const firstPt = this.points[0];
+                    const firstX = cx + Math.cos(firstPt.currentAngle) * firstPt.currentRadius;
+                    const firstY = cy + Math.sin(firstPt.currentAngle) * firstPt.currentRadius;
+                    ctx.moveTo(firstX, firstY);
+
+                    for (let i = 0; i < n; i++) {
+                        const p0 = this.points[i];
+                        const p1 = this.points[(i + 1) % n];
+                        const p2 = this.points[(i + 2) % n];
+
+                        const x0 = cx + Math.cos(p0.currentAngle) * p0.currentRadius;
+                        const y0 = cy + Math.sin(p0.currentAngle) * p0.currentRadius;
+                        const x1 = cx + Math.cos(p1.currentAngle) * p1.currentRadius;
+                        const y1 = cy + Math.sin(p1.currentAngle) * p1.currentRadius;
+                        const x2 = cx + Math.cos(p2.currentAngle) * p2.currentRadius;
+                        const y2 = cy + Math.sin(p2.currentAngle) * p2.currentRadius;
+
+                        // Control points for smooth cubic bezier
+                        const cpx1 = x0 + (x1 - x0) * 0.45 + (cx - x0) * 0.05;
+                        const cpy1 = y0 + (y1 - y0) * 0.45 + (cy - y0) * 0.05;
+                        const cpx2 = x1 - (x1 - x0) * 0.45 + (cx - x1) * 0.05;
+                        const cpy2 = y1 - (y1 - y0) * 0.45 + (cy - y1) * 0.05;
+
+                        ctx.bezierCurveTo(cpx1, cpy1, cpx2, cpy2, x1, y1);
+                    }
+                    ctx.closePath();
+
+                    // Create radial gradient for the blob
+                    const grad = ctx.createRadialGradient(cx - this.baseRadius * 0.2, cy - this.baseRadius * 0.25,
+                        this.baseRadius * 0.05, cx, cy, this.baseRadius * 1.2);
+                    grad.addColorStop(0, this.colorHighlight);
+                    grad.addColorStop(0.4, this.colorBase);
+                    grad.addColorStop(0.75, 'rgba(8,16,30,0.7)');
+                    grad.addColorStop(1, 'rgba(6,12,22,0)');
+
+                    ctx.fillStyle = grad;
+                    ctx.fill();
+
+                    // Subtle inner glow at the top-left area
+                    const innerGlow = ctx.createRadialGradient(
+                        cx - this.baseRadius * 0.3, cy - this.baseRadius * 0.35,
+                        this.baseRadius * 0.02,
+                        cx, cy,
+                        this.baseRadius * 0.7
+                    );
+                    innerGlow.addColorStop(0, 'rgba(180,210,240,0.25)');
+                    innerGlow.addColorStop(0.5, 'rgba(100,150,200,0.06)');
+                    innerGlow.addColorStop(1, 'rgba(0,0,0,0)');
+                    ctx.fillStyle = innerGlow;
+                    ctx.fill();
+                }
+            }
+
+            // ─────────────────────────────────────
+            // Floating Particles
+            // ─────────────────────────────────────
+            class FloatingParticle {
+                constructor() {
+                    this.reset();
+                    this.y = Math.random() * H;
+                }
+                reset() {
+                    this.x = Math.random() * W;
+                    this.y = Math.random() * H;
+                    this.radius = 1 + Math.random() * 2.5;
+                    this.baseAlpha = 0.15 + Math.random() * 0.45;
+                    this.alpha = this.baseAlpha;
+                    this.speedX = (Math.random() - 0.5) * 0.3;
+                    this.speedY = (Math.random() - 0.5) * 0.25 - 0.15;
+                    this.waveAmp = Math.random() * 1.5;
+                    this.waveFreq = 0.3 + Math.random() * 0.7;
+                    this.wavePhase = Math.random() * Math.PI * 2;
+                }
+                update(time) {
+                    this.x += this.speedX + Math.sin(time * this.waveFreq + this.wavePhase) * this.waveAmp * 0.04;
+                    this.y += this.speedY;
+                    if (this.x < -20 || this.x > W + 20 || this.y < -20 || this.y > H + 20) {
+                        this.reset();
+                        if (this.y < -20) this.y = H + 20;
+                        if (this.y > H + 20) this.y = -20;
+                    }
+                    // Glow near mouse
+                    const dx = this.x - mouse.x;
+                    const dy = this.y - mouse.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    const glowRadius = 180;
+                    if (mouse.isActive && dist < glowRadius) {
+                        this.alpha = Math.min(1, this.baseAlpha + (1 - dist / glowRadius) * 0.6);
+                    } else {
+                        this.alpha += (this.baseAlpha - this.alpha) * 0.05;
+                    }
+                }
+                draw(ctx) {
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(160,200,235,${this.alpha})`;
+                    ctx.fill();
+                    // Tiny glow
+                    if (this.alpha > 0.35) {
+                        ctx.beginPath();
+                        ctx.arc(this.x, this.y, this.radius * 2.5, 0, Math.PI * 2);
+                        ctx.fillStyle = `rgba(140,190,225,${this.alpha * 0.25})`;
+                        ctx.fill();
+                    }
+                }
+            }
+
+            // ─────────────────────────────────────
+            // Initialize blobs and particles
+            // ─────────────────────────────────────
+            const blobs = [
+                new FluidBlob(W * 0.25, H * 0.3, Math.min(W, H) * 0.22,
+                    'rgba(14,35,65,0.75)', 'rgba(55,115,195,0.55)', 0.28, 14),
+                new FluidBlob(W * 0.7, H * 0.25, Math.min(W, H) * 0.26,
+                    'rgba(10,28,55,0.7)', 'rgba(40,95,175,0.5)', 0.34, 16),
+                new FluidBlob(W * 0.5, H * 0.6, Math.min(W, H) * 0.24,
+                    'rgba(12,32,60,0.72)', 'rgba(48,105,185,0.5)', 0.31, 15),
+                new FluidBlob(W * 0.15, H * 0.7, Math.min(W, H) * 0.18,
+                    'rgba(9,25,48,0.68)', 'rgba(35,85,160,0.45)', 0.38, 12),
+                new FluidBlob(W * 0.82, H * 0.72, Math.min(W, H) * 0.19,
+                    'rgba(11,30,52,0.7)', 'rgba(42,100,170,0.48)', 0.4, 13),
+            ];
+
+            const particles = [];
+            const particleCount = 35;
+            for (let i = 0; i < particleCount; i++) {
+                particles.push(new FloatingParticle());
+            }
+
+            // ─────────────────────────────────────
+            // Animation Loop
+            // ─────────────────────────────────────
+            let animationTime = 0;
+            const speedFactor = 0.06;
+
+            function animate(timestamp) {
+                const dt = Math.min((timestamp - (animate.lastTimestamp || timestamp)) / 1000, 0.1);
+                animate.lastTimestamp = timestamp;
+                animationTime += dt * speedFactor;
+
+                // Smooth mouse
+                mouse.x += (mouse.tx - mouse.x) * 0.08;
+                mouse.y += (mouse.ty - mouse.y) * 0.08;
+
+                ctx.clearRect(0, 0, W, H);
+
+                // Dark base with subtle vignette
+                const vignetteGrad = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.5,
+                    W / 2, H / 2, Math.max(W, H) * 0.85);
+                vignetteGrad.addColorStop(0, 'rgba(8,13,24,0)');
+                vignetteGrad.addColorStop(0.6, 'rgba(6,10,20,0.3)');
+                vignetteGrad.addColorStop(1, 'rgba(3,6,14,0.8)');
+                ctx.fillStyle = vignetteGrad;
+                ctx.fillRect(0, 0, W, H);
+
+                // Update blob positions for mouse influence
+                blobs.forEach(blob => {
+                    blob.update(animationTime, 0.7);
+                });
+
+                // Draw blobs (sorted by Y for depth)
+                const sortedBlobs = [...blobs].sort((a, b) => {
+                    const ay = a.cy + a.driftY;
+                    const by = b.cy + b.driftY;
+                    return ay - by;
+                });
+                sortedBlobs.forEach(blob => blob.draw(ctx, animationTime));
+
+                // Draw particles
+                particles.forEach(p => {
+                    p.update(animationTime);
+                    p.draw(ctx);
+                });
+
+                // Very subtle overall grain/noise overlay for texture
+                ctx.fillStyle = 'rgba(0,0,0,0.015)';
+                ctx.fillRect(0, 0, W, H);
+
+                requestAnimationFrame(animate);
+            }
+            animate.lastTimestamp = performance.now();
+            requestAnimationFrame(animate);
+
+            // ─────────────────────────────────────
+            // Handle resize for blobs
+            // ─────────────────────────────────────
+            window.addEventListener('resize', () => {
+                resizeCanvas();
+                // Reposition blobs proportionally
+                const oldW = blobs[0].cx / (blobs[0].cx / W || 1);
+                blobs.forEach((blob, i) => {
+                    const ratioX = blob.cx / (W || blob.cx || 1);
+                    const ratioY = blob.cy / (H || blob.cy || 1);
+                    blob.cx = W * (ratioX || 0.25 + i * 0.2);
+                    blob.cy = H * (ratioY || 0.3 + i * 0.15);
+                    blob.baseRadius = Math.min(W, H) * (0.16 + i * 0.025);
+                });
+                particles.forEach(p => p.reset());
+            });
+
+            // ─────────────────────────────────────
+            // Nav scroll effect
+            // ─────────────────────────────────────
+            const navBar = document.getElementById('navBar');
+            window.addEventListener('scroll', () => {
+                if (window.scrollY > 30) {
+                    navBar.classList.add('scrolled');
+                } else {
+                    navBar.classList.remove('scrolled');
+                }
+            });
+
+            // ─────────────────────────────────────
+            // Feature cards - dynamic glass effect based on mouse proximity
+            // ─────────────────────────────────────
+            const featureCards = document.querySelectorAll('.feature-card');
+            function updateCardEffects() {
+                featureCards.forEach(card => {
+                    const rect = card.getBoundingClientRect();
+                    const cardCx = rect.left + rect.width / 2;
+                    const cardCy = rect.top + rect.height / 2;
+                    const dx = mouse.tx - cardCx;
+                    const dy = mouse.ty - cardCy;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    const maxDist = 500;
+                    const proximity = Math.max(0, 1 - dist / maxDist);
+
+                    // Dynamically adjust card blur based on proximity
+                    const extraBlur = proximity * 6;
+                    const extraSaturate = proximity * 40;
+                    card.style.setProperty('--card-blur', (18 + extraBlur) + 'px');
+                    card.style.setProperty('--card-saturate', (160 + extraSaturate) + '%');
+
+                    // Adjust refractive shadow
+                    const shiftX = (dx / (rect.width / 2 + 1)) * proximity * 8;
+                    const shiftY = (dy / (rect.height / 2 + 1)) * proximity * 8;
+                    card.style.setProperty('--shadow-refract-warm',
+                        `rgba(180,140,100,${0.08 + proximity * 0.1})`);
+                    card.style.setProperty('--shadow-refract-cool',
+                        `rgba(80,140,200,${0.1 + proximity * 0.12})`);
+
+                    // Subtle transform based on mouse
+                    if (proximity > 0.1 && mouse.isActive) {
+                        const tiltX = (dy / (rect.height / 2)) * proximity * 1.5;
+                        const tiltY = -(dx / (rect.width / 2)) * proximity * 1.5;
+                        card.style.transform =
+                            `perspective(800px) rotateX(${tiltX}deg) rotateY(${tiltY}deg) translateY(-4px)`;
+                    } else if (!card.matches(':hover')) {
+                        card.style.transform = '';
+                    }
+                });
+            }
+
+            // Update card effects in the animation loop
+            const originalAnimate = animate;
+            // We'll hook into the animation by adding card updates
+            const cardUpdateInterval = setInterval(updateCardEffects, 60);
+
+            // ─────────────────────────────────────
+            // Initial setup
+            // ─────────────────────────────────────
+            updateCardEffects();
+
+            console.log('%c FlowMind %c 液态智能 · 无限流动 ',
+                'font-size:1.4em;font-weight:bold;color:#b0cfe8;',
+                'font-size:0.9em;color:#8ab8e8;');
+            console.log('%c 大模型科技 · 前沿AI基础设施 ',
+                'color:rgba(255,255,255,0.5);font-style:italic;');
+        })();
+    </script>
+</body>
+</html>

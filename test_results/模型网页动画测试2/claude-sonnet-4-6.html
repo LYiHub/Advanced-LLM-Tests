@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Motion Design Sequence</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #000; overflow: hidden; width: 100vw; height: 100vh; }
+  canvas { display: block; position: absolute; top: 0; left: 0; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+const W = canvas.width, H = canvas.height;
+const cx = W/2, cy = H/2;
+
+let startTime = null;
+
+function easeOut(t) { return 1 - Math.pow(1-t,3); }
+function easeInOut(t) { return t<0.5 ? 2*t*t : -1+(4-2*t)*t; }
+function easeOutElastic(t) {
+  if(t===0||t===1) return t;
+  return Math.pow(2,-10*t)*Math.sin((t-0.075)*(2*Math.PI)/0.3)+1;
+}
+function lerp(a,b,t){ return a+(b-a)*t; }
+function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
+function norm(t,a,b){ return clamp((t-a)/(b-a),0,1); }
+
+// Particle system for vortex & watch
+let particles = [];
+
+function initParticles(n) {
+  particles = [];
+  for(let i=0;i<n;i++){
+    const angle = Math.random()*Math.PI*2;
+    const r = 20 + Math.random()*150;
+    particles.push({
+      angle, r,
+      ox: cx + Math.cos(angle)*r,
+      oy: cy + Math.sin(angle)*r,
+      x: cx + Math.cos(angle)*r,
+      y: cy + Math.sin(angle)*r,
+      vangle: (Math.random()>0.5?1:-1)*(0.3+Math.random()*0.5),
+      vr: r,
+      phase: Math.random()*Math.PI*2,
+      size: 0.8+Math.random()*1.2,
+      alpha: 0.5+Math.random()*0.5,
+      targetX: 0, targetY: 0,
+      a: angle, cr: r,
+      rx: 80+Math.random()*100,
+      ry: 30+Math.random()*60
+    });
+  }
+}
+
+// Watch outline points
+function watchPoints(n) {
+  const pts = [];
+  // rectangular watch body with lugs
+  const bw=120, bh=140, cr=18;
+  const lugW=30, lugH=20;
+  // top lug
+  for(let i=0;i<n*0.08;i++){
+    const tt=i/(n*0.08);
+    pts.push({x:cx+lerp(-lugW/2,lugW/2,tt), y:cy-bh/2-lugH});
+  }
+  // body outline
+  const bodyPts = n*0.7;
+  for(let i=0;i<bodyPts;i++){
+    const tt=i/bodyPts;
+    const angle2 = tt*Math.PI*2;
+    // rounded rect parametric
+    const px = Math.sign(Math.cos(angle2))*Math.min(Math.abs(bw/2/Math.cos(angle2)),bw/2-cr) + Math.sign(Math.cos(angle2))*cr*Math.cos(angle2);
+    const py = Math.sign(Math.sin(angle2))*Math.min(Math.abs(bh/2/Math.sin(angle2)),bh/2-cr) + Math.sign(Math.sin(angle2))*cr*Math.sin(angle2);
+    pts.push({x:cx+px, y:cy+py});
+  }
+  // bottom lug
+  for(let i=0;i<n*0.08;i++){
+    const tt=i/(n*0.08);
+    pts.push({x:cx+lerp(lugW/2,-lugW/2,tt), y:cy+bh/2+lugH});
+  }
+  // clock hands
+  for(let i=0;i<n*0.07;i++){
+    const tt=i/(n*0.07);
+    pts.push({x:cx+lerp(0,-30,tt)*Math.sin(1), y:cy+lerp(0,-30,tt)*Math.cos(1)});
+  }
+  for(let i=0;i<n*0.07;i++){
+    const tt=i/(n*0.07);
+    pts.push({x:cx+lerp(0,20,tt)*Math.sin(3.5), y:cy+lerp(0,20,tt)*Math.cos(3.5)});
+  }
+  return pts;
+}
+
+function draw(ts) {
+  if(!startTime) startTime = ts;
+  const t = (ts - startTime)/1000;
+
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#000';
+  ctx.fillRect(0,0,W,H);
+
+  // ---- 0-1s: ORIGIN ----
+  if(t < 1) {
+    const tp = norm(t,0,1);
+    // central dot
+    const dotR = lerp(3,4,Math.sin(tp*Math.PI));
+    ctx.beginPath();
+    ctx.arc(cx,cy,dotR,0,Math.PI*2);
+    ctx.fillStyle='#fff';
+    ctx.fill();
+    // 3 ripple rings
+    for(let i=0;i<3;i++){
+      const delay = i*0.25;
+      const rp = clamp((tp - delay)/0.6, 0, 1);
+      if(rp>0) {
+        const maxR = 80+i*30;
+        const rr = easeOut(rp)*maxR;
+        const alpha = (1-rp)*0.8;
+        ctx.beginPath();
+        ctx.arc(cx,cy,rr,0,Math.PI*2);
+        ctx.strokeStyle=`rgba(255,255,255,${alpha})`;
+        ctx.lineWidth=1.5;
+        ctx.stroke();
+      }
+    }
+  }
+
+  // ---- 1-2s: LINE ----
+  if(t>=1 && t<2) {
+    const tp = norm(t,1,2);
+    const ep = easeOutElastic(Math.min(tp*1.2,1));
+    const lineW = ep * W;
+    ctx.strokeStyle='rgba(255,255,255,1)';
+    ctx.lineWidth=1;
+    ctx.beginPath();
+    ctx.moveTo(cx - lineW/2, cy);
+    ctx.lineTo(cx + lineW/2, cy);
+    ctx.stroke();
+    // dot
+    ctx.beginPath();
+    ctx.arc(cx,cy,2,0,Math.PI*2);
+    ctx.fillStyle='#fff';
+    ctx.fill();
+  }
+
+  // ---- 2-4s: GRID → CIRCLE ----
+  if(t>=2 && t<4) {
+    const tp = norm(t,2,4);
+    const gridPhase = norm(tp,0,0.4); // 0→grid
+    const morphPhase = norm(tp,0.4,1.0); // grid→circle
+
+    const gridSize = 160;
+    const lines = 5; // 5 horizontal + 5 vertical = more than 9 lines total
+    const spacing = gridSize/4;
+
+    ctx.save();
+    ctx.globalAlpha = 1;
+
+    if(morphPhase < 1) {
+      // Draw grid lines morphing to circle
+      const numH = 5, numV = 5;
+
+      for(let i=0;i<numH;i++){
+        const delay = i*0.06;
+        const lp = clamp((gridPhase - delay)/0.5,0,1);
+        if(lp<=0) continue;
+        const yOff = (i-2)*spacing;
+        const bend = morphPhase;
+
+        // morph each line to arc
+        const alpha = lerp(1,0,morphPhase>0.8?norm(morphPhase,0.8,1):0);
+        ctx.strokeStyle=`rgba(255,255,255,${alpha})`;
+        ctx.lineWidth=0.8;
+        ctx.beginPath();
+        const segs=60;
+        for(let s=0;s<=segs;s++){
+          const px = lerp(-W*0.4, W*0.4, s/segs)*lp;
+          // bend toward circle
+          const circleR=gridSize;
+          const normX=px/W*0.4;
+          const yBend = yOff*(1-bend) + bend*(cy + circleR*Math.sin(Math.acos(clamp(px/circleR,-1,1)))*(yOff<0?-1:1) - cy);
+          const realY = cy + (yOff*(1-bend));
+          if(s===0) ctx.moveTo(cx+px, realY);
+          else ctx.lineTo(cx+px, realY);
+        }
+        ctx.stroke();
+      }
+
+      for(let i=0;i<numV;i++){
+        const delay = i*0.06+0.03;
+        const lp = clamp((gridPhase - delay)/0.5,0,1);
+        if(lp<=0) continue;
+        const xOff = (i-2)*spacing;
+        const alpha = lerp(1,0,morphPhase>0.8?norm(morphPhase,0.8,1):0);
+        ctx.strokeStyle=`rgba(255,255,255,${alpha})`;
+        ctx.lineWidth=0.8;
+        ctx.beginPath();
+        ctx.moveTo(cx+xOff, cy - H*0.35*lp);
+        ctx.lineTo(cx+xOff, cy + H*0.35*lp);
+        ctx.stroke();
+      }
+    }
+
+    // Emerging circle
+    if(morphPhase>0.3) {
+      const cp = norm(morphPhase,0.3,1.0);
+      const circleAlpha = easeInOut(cp);
+      const r = 100;
+      ctx.beginPath();
+      ctx.arc(cx,cy,r,0,Math.PI*2);
+      ctx.strokeStyle=`rgba(255,255,255,${circleAlpha})`;
+      ctx.lineWidth=1.5;
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // ---- 4-6s: WIREFRAME → SOLID SPHERE ----
+  if(t>=4 && t<6) {
+    const tp = norm(t,4,6);
+    const wirePhase = norm(tp,0,0.4);
+    const solidPhase = norm(tp,0.5,1.0);
+    const R=100;
+    const rotAngle = tp*Math.PI*0.5;
+
+    ctx.save();
+    ctx.translate(cx,cy);
+
+    // Draw wireframe sphere
+    const wireAlpha = 1-easeInOut(solidPhase);
+    if(wireAlpha>0.01) {
+      ctx.strokeStyle=`rgba(255,255,255,${wireAlpha*0.9})`;
+      ctx.lineWidth=0.8;
+
+      // Latitude lines
+      const latCount=8;
+      for(let i=0;i<latCount;i++){
+        const lat = (i/(latCount-1)-0.5)*Math.PI;
+        const r2 = R*Math.cos(lat);
+        const y2 = R*Math.sin(lat);
+        // draw as ellipse
+        const ep2=easeOut(wirePhase);
+        ctx.beginPath();
+        ctx.ellipse(0,y2,r2*ep2,r2*0.3*ep2,0,0,Math.PI*2);
+        ctx.stroke();
+      }
+
+      // Longitude lines
+      const lonCount=10;
+      for(let i=0;i<lonCount;i++){
+        const lon = (i/lonCount)*Math.PI*2 + rotAngle;
+        const ex = R*Math.cos(lon)*easeOut(wirePhase);
+        const ey = R*Math.sin(lon)*0.3*easeOut(wirePhase);
+        ctx.beginPath();
+        ctx.ellipse(0,0,ex,R*easeOut(wirePhase),0,0,Math.PI*2);
+        ctx.stroke();
+      }
+    }
+
+    // Solid sphere fill
+    if(solidPhase>0) {
+      const sa = easeInOut(solidPhase);
+      // base sphere
+      const grad = ctx.createRadialGradient(-R*0.3,-R*0.35,R*0.05, 0,0, R);
+      grad.addColorStop(0,`rgba(255,255,255,${sa})`);
+      grad.addColorStop(0.4,`rgba(220,220,220,${sa})`);
+      grad.addColorStop(1,`rgba(80,80,80,${sa})`);
+      ctx.beginPath();
+      ctx.arc(0,0,R,0,Math.PI*2);
+      ctx.fillStyle=grad;
+      ctx.fill();
+
+      // specular highlight
+      const hgrad = ctx.createRadialGradient(-R*0.38,-R*0.42,2,-R*0.3,-R*0.35,R*0.45);
+      hgrad.addColorStop(0,`rgba(255,255,255,${sa*0.9})`);
+      hgrad.addColorStop(0.5,`rgba(255,255,255,${sa*0.3})`);
+      hgrad.addColorStop(1,'rgba(255,255,255,0)');
+      ctx.beginPath();
+      ctx.arc(0,0,R,0,Math.PI*2);
+      ctx.fillStyle=hgrad;
+      ctx.fill();
+    }
+
+    ctx.restore();
+  }
+
+  // ---- 6-8s: INTERFACE ----
+  if(t>=6 && t<8) {
+    const tp = norm(t,6,8);
+    const expandP = easeOut(norm(tp,0,0.4));
+    const uiP = norm(tp,0.3,0.9);
+
+    const pw=200, ph=360, cr=20;
+    const sx=cx-pw/2, sy=cy-ph/2;
+
+    ctx.save();
+    ctx.globalAlpha=1;
+
+    // Phone outline
+    const scaleX=lerp(0,1,expandP);
+    ctx.save();
+    ctx.translate(cx,cy);
+    ctx.scale(scaleX,expandP);
+    ctx.translate(-cx,-cy);
+
+    // rounded rect phone
+    ctx.strokeStyle='rgba(255,255,255,0.9)';
+    ctx.lineWidth=1.5;
+    ctx.beginPath();
+    ctx.roundRect(sx,sy,pw,ph,cr);
+    ctx.stroke();
+    ctx.restore();
+
+    if(uiP>0) {
+      const ua=easeInOut(uiP);
+      ctx.globalAlpha=ua;
+
+      // Status bar
+      ctx.strokeStyle='rgba(255,255,255,0.7)';
+      ctx.lineWidth=0.7;
+      ctx.beginPath();
+      ctx.moveTo(sx+15,sy+30);
+      ctx.lineTo(sx+pw-15,sy+30);
+      ctx.stroke();
+
+      // time indicator dots
+      ctx.fillStyle='rgba(255,255,255,0.8)';
+      for(let i=0;i<3;i++){
+        ctx.beginPath();
+        ctx.arc(sx+30+i*15,sy+20,2,0,Math.PI*2);
+        ctx.fill();
+      }
+
+      // Signal bars
+      for(let i=0;i<4;i++){
+        const bh2=(i+1)*4;
+        ctx.fillRect(sx+pw-40+i*7, sy+20-bh2+4, 5, bh2);
+      }
+
+      // App icon grid
+      const iconSize=35, iconGap=18;
+      const startX=sx+25, startY=sy+60;
+      for(let row=0;row<4;row++){
+        for(let col=0;col<4;col++){
+          const delay=(row*4+col)*0.04;
+          const ip2=clamp((uiP-0.1-delay)/0.5,0,1);
+          if(ip2>0) {
+            const ix=startX+col*(iconSize+iconGap);
+            const iy=startY+row*(iconSize+iconGap);
+            ctx.globalAlpha=ua*easeOut(ip2);
+            ctx.strokeStyle='rgba(255,255,255,0.8)';
+            ctx.lineWidth=0.8;
+            ctx.beginPath();
+            ctx.roundRect(ix,iy,iconSize,iconSize,8);
+            ctx.stroke();
+            // abstract icon content
+            ctx.beginPath();
+            ctx.arc(ix+iconSize/2,iy+iconSize/2,iconSize*0.2,0,Math.PI*2);
+            ctx.stroke();
+          }
+        }
+      }
+
+      ctx.globalAlpha=ua;
+      // Home indicator
+      ctx.strokeStyle='rgba(255,255,255,0.6)';
+      ctx.lineWidth=2;
+      ctx.lineCap='round';
+      ctx.beginPath();
+      ctx.moveTo(cx-30,sy+ph-18);
+      ctx.lineTo(cx+30,sy+ph-18);
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+
+  // ---- 8-10s: CUBE → BLOOM ----
+  if(t>=8 && t<10) {
+    const tp = norm(t,8,10);
+    const foldP = norm(tp,0,0.3);
+    const cubeP = norm(tp,0.1,0.5);
+    const flipP = norm(tp,0.45,0.65);
+    const bloomP = norm(tp,0.6,1.0);
+
+    ctx.save();
+    ctx.translate(cx,cy);
+
+    // Interface folding (fade out)
+    if(foldP<1) {
+      // phone shrinking
+      const ph2=360*(1-easeInOut(foldP));
+      const pw2=200*(1-easeInOut(foldP));
+      ctx.strokeStyle=`rgba(255,255,255,${1-foldP})`;
+      ctx.lineWidth=1.5;
+      if(pw2>2) {
+        ctx.beginPath();
+        ctx.roundRect(-pw2/2,-ph2/2,pw2,ph2,10);
+        ctx.stroke();
+      }
+    }
+
+    // Isometric wireframe cube
+    if(cubeP>0 && bloomP<1) {
+      const cubeAlpha=(1-easeInOut(bloomP))*easeInOut(cubeP);
+      const s=70;
+      const flip=Math.sin(flipP*Math.PI)*0.5;
+
+      // Isometric projection
+      const iso=(x,y,z)=>{
+        return {
+          px:(x-z)*Math.cos(0.523+flip),
+          py:(x+z)*Math.sin(0.523+flip)-y
+        };
+      };
+      const verts=[
+        [-s,-s,-s],[ s,-s,-s],[ s, s,-s],[-s, s,-s],
+        [-s,-s, s],[ s,-s, s],[ s, s, s],[-s, s, s]
+      ].map(([x,y,z])=>iso(x,y,z));
+
+      const edges=[[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]];
+      ctx.strokeStyle=`rgba(255,255,255,${cubeAlpha})`;
+      ctx.lineWidth=1;
+      edges.forEach(([a,b])=>{
+        ctx.beginPath();
+        ctx.moveTo(verts[a].px,verts[a].py);
+        ctx.lineTo(verts[b].px,verts[b].py);
+        ctx.stroke();
+      });
+    }
+
+    // Bloom: 6 petals
+    if(bloomP>0) {
+      const ba=easeInOut(bloomP);
+      const petalColors=['rgba(255,255,255,','rgba(240,240,240,','rgba(255,255,255,','rgba(230,230,230,','rgba(255,255,255,','rgba(245,245,245,'];
+      for(let i=0;i<6;i++){
+        const angle3=(i/6)*Math.PI*2 + ba*0.3;
+        const dist=ba*120;
+        const px=Math.cos(angle3)*dist;
+        const py=Math.sin(angle3)*dist;
+        const petalAlpha=ba;
+        ctx.save();
+        ctx.translate(px,py);
+        ctx.rotate(angle3);
+        ctx.beginPath();
+        ctx.ellipse(0,0,30*ba,15*ba,0,0,Math.PI*2);
+        ctx.fillStyle=petalColors[i]+(petalAlpha*0.9)+')';
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    ctx.restore();
+  }
+
+  // ---- 10-12s: VORTEX ----
+  if(t>=10 && t<12) {
+    const tp=norm(t,10,12);
+    if(tp<0.05 || particles.length===0) {
+      initParticles(300);
+    }
+    const dt=0.016;
+
+    ctx.save();
+    particles.forEach(p=>{
+      // orbital motion
+      p.a += p.vangle*dt;
+      p.x=cx+Math.cos(p.a)*p.rx;
+      p.y=cy+Math.sin(p.a)*p.ry;
+
+      // flicker
+      const flicker=0.5+0.5*Math.sin(p.phase+tp*8);
+      const alpha=p.alpha*flicker*(0.5+0.5*tp);
+
+      ctx.beginPath();
+      ctx.arc(p.x,p.y,p.size,0,Math.PI*2);
+      ctx.fillStyle=`rgba(255,255,255,${alpha})`;
+      ctx.fill();
+    });
+    ctx.restore();
+  }
+
+  // ---- 12-13s: WATCH assembly ----
+  if(t>=12 && t<13) {
+    const tp=norm(t,12,13);
+    const assembleP=easeInOut(tp);
+
+    if(tp<0.05||particles.length===0){
+      initParticles(300);
+    }
+
+    // Generate watch target positions
+    const wpts=watchPoints(particles.length);
+    const dt=0.016;
+
+    ctx.save();
+    particles.forEach((p,i)=>{
+      const wp=wpts[i%wpts.length];
+      // move toward watch target
+      p.x=lerp(p.x, wp.x, assembleP*0.15);
+      p.y=lerp(p.y, wp.y, assembleP*0.15);
+
+      const alpha=0.6+0.4*assembleP;
+      ctx.beginPath();
+      ctx.arc(p.x,p.y,p.size,0,Math.PI*2);
+      ctx.fillStyle=`rgba(255,255,255,${alpha})`;
+      ctx.fill();
+    });
+    ctx.restore();
+  }
+
+  // ---- 13-14s: COLLAPSE ----
+  if(t>=13 && t<14) {
+    const tp=norm(t,13,14);
+    const dissolveP=norm(tp,0,0.5);
+    const collapseP=norm(tp,0.4,0.9);
+    const pulseP=norm(tp,0.7,0.85);
+    const implodeP=norm(tp,0.85,1.0);
+
+    ctx.save();
+
+    // Watch dissolving into ribbons
+    if(dissolveP<1) {
+      const wpts=watchPoints(200);
+      wpts.forEach((wp,i)=>{
+        const dx=(cx-wp.x)*dissolveP*0.8;
+        const dy=(cy-wp.y)*dissolveP*0.8;
+        const alpha=(1-dissolveP)*0.8;
+        ctx.beginPath();
+        ctx.arc(wp.x+dx,wp.y+dy,1.2,0,Math.PI*2);
+        ctx.fillStyle=`rgba(255,255,255,${alpha})`;
+        ctx.fill();
+      });
+    }
+
+    // Dense sphere forming
+    if(collapseP>0) {
+      const r=lerp(80,8,easeInOut(collapseP));
+      const brightness=lerp(180,255,easeInOut(collapseP));
+      const grad=ctx.createRadialGradient(cx-r*0.2,cy-r*0.2,0,cx,cy,r);
+      grad.addColorStop(0,`rgba(255,255,255,${collapseP})`);
+      grad.addColorStop(0.6,`rgba(${brightness},${brightness},${brightness},${collapseP*0.8})`);
+      grad.addColorStop(1,`rgba(200,200,200,0)`);
+      ctx.beginPath();
+      ctx.arc(cx,cy,r,0,Math.PI*2);
+      ctx.fillStyle=grad;
+      ctx.fill();
+    }
+
+    // Pulse
+    if(pulseP>0&&pulseP<1) {
+      const pr=easeOut(pulseP)*120;
+      const pa=(1-pulseP)*0.7;
+      ctx.beginPath();
+      ctx.arc(cx,cy,pr,0,Math.PI*2);
+      ctx.strokeStyle=`rgba(255,255,255,${pa})`;
+      ctx.lineWidth=2;
+      ctx.stroke();
+    }
+
+    // Implode to point
+    if(implodeP>0) {
+      const r2=lerp(8,1.5,easeInOut(implodeP));
+      const brightness2=255;
+      ctx.beginPath();
+      ctx.arc(cx,cy,r2,0,Math.PI*2);
+      ctx.fillStyle=`rgba(255,255,255,${0.9+implodeP*0.1})`;
+      ctx.fill();
+      // glow
+      const ggrad=ctx.createRadialGradient(cx,cy,0,cx,cy,r2*8);
+      ggrad.addColorStop(0,`rgba(255,255,255,${0.3*implodeP})`);
+      ggrad.addColorStop(1,'rgba(255,255,255,0)');
+      ctx.beginPath();
+      ctx.arc(cx,cy,r2*8,0,Math.PI*2);
+      ctx.fillStyle=ggrad;
+      ctx.fill();
+    }
+
+    ctx.restore();
+  }
+
+  // ---- 14-15s: LOGO ----
+  if(t>=14) {
+    const tp=norm(t,14,15);
+    const pauseP=norm(tp,0,0.15);
+    const expandP=norm(tp,0.15,0.55);
+    const amberP=norm(tp,0.5,0.8);
+    const amberFadeP=norm(tp,0.7,0.95);
+
+    ctx.save();
+
+    // Point lingering
+    if(pauseP<1||expandP<0.01) {
+      const dotAlpha=1-easeInOut(expandP);
+      if(dotAlpha>0.01){
+        ctx.beginPath();
+        ctx.arc(cx,cy,1.5,0,Math.PI*2);
+        ctx.fillStyle=`rgba(255,255,255,${dotAlpha})`;
+        ctx.fill();
+      }
+    }
+
+    // Amber pulse glow
+    if(amberP>0) {
+      const ap=easeOut(amberP);
+      const af=1-easeInOut(amberFadeP);
+      const amberR=ap*200;
+      const grad=ctx.createRadialGradient(cx,cy,0,cx,cy,amberR);
+      grad.addColorStop(0,`rgba(255,180,60,${0.25*af})`);
+      grad.addColorStop(0.4,`rgba(200,120,30,${0.15*af})`);
+      grad.addColorStop(1,'rgba(150,80,10,0)');
+      ctx.beginPath();
+      ctx.arc(cx,cy,amberR,0,Math.PI*2);
+      ctx.fillStyle=grad;
+      ctx.fill();
+    }
+
+    // Logo text expanding/appearing
+    if(expandP>0) {
+      const ea=easeOut(expandP);
+      const textAlpha=easeInOut(expandP);
+
+      // subtle scale-in
+      ctx.save();
+      ctx.translate(cx,cy);
+      ctx.scale(lerp(0.7,1,ea),lerp(0.7,1,ea));
+      ctx.translate(-cx,-cy);
+
+      // Logo mark — minimal geometric symbol above text
+      const markAlpha=textAlpha;
+      ctx.strokeStyle=`rgba(255,255,255,${markAlpha})`;
+      ctx.lineWidth=1;
+
+      // Simple geometric mark: circle with horizontal line
+      ctx.beginPath();
+      ctx.arc(cx,cy-42,12,0,Math.PI*2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(cx-6,cy-42);
+      ctx.lineTo(cx+6,cy-42);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(cx,cy-54);
+      ctx.lineTo(cx,cy-30);
+      ctx.stroke();
+
+      // Brand name
+      ctx.fillStyle=`rgba(255,255,255,${textAlpha})`;
+      ctx.font=`300 28px 'Helvetica Neue', Helvetica, Arial, sans-serif`;
+      ctx.textAlign='center';
+      ctx.textBaseline='middle';
+      ctx.letterSpacing='8px';
+      ctx.fillText('LUMINA', cx, cy+5);
+
+      // Tagline
+      ctx.globalAlpha=textAlpha*0.55;
+      ctx.font=`300 10px 'Helvetica Neue', Helvetica, Arial, sans-serif`;
+      ctx.fillStyle='rgba(255,255,255,1)';
+      ctx.fillText('INTELLIGENCE · DESIGN · FORM', cx, cy+30);
+
+      ctx.restore();
+    }
+
+    ctx.restore();
+  }
+
+  requestAnimationFrame(draw);
+}
+
+requestAnimationFrame(draw);
+
+window.addEventListener('resize',()=>{
+  canvas.width=window.innerWidth;
+  canvas.height=window.innerHeight;
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,945 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Motion Design Sequence</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #000000;
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: default;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        canvas {
+            display: block;
+            background: #000000;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="c"></canvas>
+    <script>
+        (function() {
+            const canvas = document.getElementById('c');
+            const ctx = canvas.getContext('2d');
+
+            let W, H, cx, cy, R;
+            let startTime = null;
+            const TOTAL_DURATION = 15.0;
+            let animationId;
+
+            function resize() {
+                W = canvas.width = window.innerWidth;
+                H = canvas.height = window.innerHeight;
+                cx = W / 2;
+                cy = H / 2;
+                R = Math.min(W, H) * 0.35;
+            }
+
+            window.addEventListener('resize', resize);
+            resize();
+
+            function easeOut(t) { return 1 - Math.pow(1 - t, 3); }
+
+            function easeInOut(t) { return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t; }
+
+            function easeIn(t) { return t * t * t; }
+
+            function easeOutBack(t) { const c1 = 1.70158; const c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(
+                    t - 1, 2); }
+
+            function easeInOutCubic(t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
+
+            function lerp(a, b, t) { return a + (b - a) * t; }
+
+            function smoothstep(t) { return t * t * (3 - 2 * t); }
+
+            function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+
+            function drawGlow(x, y, radius, color, alpha) {
+                const gradient = ctx.createRadialGradient(x, y, radius * 0.1, x, y, radius);
+                gradient.addColorStop(0, color);
+                gradient.addColorStop(0.3, color);
+                gradient.addColorStop(0.7, 'rgba(255,140,0,0.05)');
+                gradient.addColorStop(1, 'rgba(255,140,0,0)');
+                ctx.fillStyle = gradient;
+                ctx.globalAlpha = alpha;
+                ctx.beginPath();
+                ctx.arc(x, y, radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.globalAlpha = 1;
+            }
+
+            function project3D(x, y, z) {
+                const dist = 4;
+                const scale = dist / (dist + z);
+                return { x: cx + x * scale * R, y: cy - y * scale * R, scale: scale };
+            }
+
+            function getSpherePoint(theta, phi, rotY) {
+                const cosT = Math.cos(theta);
+                const sinT = Math.sin(theta);
+                const cosP = Math.cos(phi);
+                const sinP = Math.sin(phi);
+                let x = cosP * cosT;
+                let y = sinP;
+                let z = cosP * sinT;
+                const cosRY = Math.cos(rotY);
+                const sinRY = Math.sin(rotY);
+                const x2 = x * cosRY - z * sinRY;
+                const z2 = x * sinRY + z * cosRY;
+                return { x: x2, y: y, z: z2 };
+            }
+
+            function drawPulsingRing(cx, cy, ringRadius, alpha, thickness) {
+                ctx.strokeStyle = `rgba(255,255,255,${alpha})`;
+                ctx.lineWidth = thickness;
+                ctx.beginPath();
+                ctx.arc(cx, cy, ringRadius, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+
+            const particles = [];
+            const NUM_PARTICLES = 350;
+            for (let i = 0; i < NUM_PARTICLES; i++) {
+                particles.push({
+                    id: i,
+                    orbitA: 0,
+                    orbitB: 0,
+                    orbitAngle: 0,
+                    orbitSpeed: 0,
+                    phase: 0,
+                    clockwise: true,
+                    targetX: 0,
+                    targetY: 0,
+                    currentX: 0,
+                    currentY: 0,
+                    alpha: 1,
+                    size: 1.2 + Math.random() * 0.8
+                });
+            }
+
+            function getWatchOutlinePoints() {
+                const points = [];
+                const ww = R * 0.65;
+                const wh = R * 0.85;
+                const cornerR = R * 0.08;
+                const lugW = R * 0.12;
+                const lugH = R * 0.15;
+                const lugGap = R * 0.08;
+                const totalPoints = 500;
+
+                function addRectPath(cxr, cyr, hw, hh, cr, n) {
+                    const rectPoints = [];
+                    const perim = 2 * (hw + hh) * 2 - 8 * cr + 2 * Math.PI * cr;
+                    const straightH = Math.max(0, hw - cr);
+                    const straightV = Math.max(0, hh - cr);
+                    const totalStraight = 4 * straightH + 4 * straightV;
+                    const arcTotal = 2 * Math.PI * cr;
+                    const straightRatio = totalStraight / (totalStraight + arcTotal);
+                    const arcRatio = arcTotal / (totalStraight + arcTotal);
+                    const nStraight = Math.floor(n * straightRatio);
+                    const nArc = n - nStraight;
+                    const straightSegments = [
+                        { sx: cxr - hw + cr, sy: cyr - hh, ex: cxr + hw - cr, ey: cyr - hh, count: Math.floor(
+                                nStraight / 8) },
+                        { sx: cxr + hw, sy: cyr - hh + cr, ex: cxr + hw, ey: cyr + hh - cr, count: Math.floor(
+                                nStraight / 8) },
+                        { sx: cxr + hw - cr, sy: cyr + hh, ex: cxr - hw + cr, ey: cyr + hh, count: Math.floor(
+                                nStraight / 8) },
+                        { sx: cxr - hw, sy: cyr + hh - cr, ex: cxr - hw, ey: cyr - hh + cr, count: Math.floor(
+                                nStraight / 8) },
+                        { sx: cxr - hw + cr, sy: cyr - hh, ex: cxr + hw - cr, ey: cyr - hh, count: Math.floor(
+                                nStraight / 8) },
+                        { sx: cxr + hw, sy: cyr - hh + cr, ex: cxr + hw, ey: cyr + hh - cr, count: Math.floor(
+                                nStraight / 8) },
+                        { sx: cxr + hw - cr, sy: cyr + hh, ex: cxr - hw + cr, ey: cyr + hh, count: Math.floor(
+                                nStraight / 8) },
+                        { sx: cxr - hw, sy: cyr + hh - cr, ex: cxr - hw, ey: cyr - hh + cr, count: Math.floor(
+                                nStraight / 8) },
+                    ];
+                    let rem = nStraight - straightSegments.reduce((s, seg) => s + seg.count, 0);
+                    for (let s = 0; s < straightSegments.length && rem > 0; s++) { straightSegments[s].count++;
+                        rem--; }
+                    for (const seg of straightSegments) {
+                        for (let i = 0; i < seg.count; i++) {
+                            const t = seg.count === 1 ? 0.5 : i / (seg.count - 1);
+                            rectPoints.push({ x: lerp(seg.sx, seg.ex, t), y: lerp(seg.sy, seg.ey, t) });
+                        }
+                    }
+                    const arcCenters = [
+                        { ax: cxr + hw - cr, ay: cyr - hh + cr, sa: -Math.PI / 2, ea: 0 },
+                        { ax: cxr + hw - cr, ay: cyr + hh - cr, sa: 0, ea: Math.PI / 2 },
+                        { ax: cxr - hw + cr, ay: cyr + hh - cr, sa: Math.PI / 2, ea: Math.PI },
+                        { ax: cxr - hw + cr, ay: cyr - hh + cr, sa: Math.PI, ea: 3 * Math.PI / 2 },
+                    ];
+                    const arcPtsEach = Math.floor(nArc / 4);
+                    let arcRem = nArc - arcPtsEach * 4;
+                    for (let a = 0; a < arcCenters.length; a++) {
+                        const ac = arcCenters[a];
+                        const count = arcPtsEach + (a < arcRem ? 1 : 0);
+                        for (let i = 0; i < count; i++) {
+                            const angle = ac.sa + (ac.ea - ac.sa) * (i / Math.max(1, count - 1));
+                            rectPoints.push({ x: ac.ax + cr * Math.cos(angle), y: ac.ay + cr * Math.sin(angle) });
+                        }
+                    }
+                    return rectPoints;
+                }
+
+                let pts = addRectPath(cx, cy, ww, wh, cornerR, Math.floor(totalPoints * 0.75));
+
+                const lugPositions = [
+                    { lx: cx - lugGap - lugW / 2, ly: cy - wh, lw: lugW, lh: lugH },
+                    { lx: cx + lugGap + lugW / 2, ly: cy - wh, lw: lugW, lh: lugH },
+                    { lx: cx - lugGap - lugW / 2, ly: cy + wh, lw: lugW, lh: lugH },
+                    { lx: cx + lugGap + lugW / 2, ly: cy + wh, lw: lugW, lh: lugH },
+                ];
+                const lugPtsTotal = totalPoints - pts.length;
+                const lugPtsEach = Math.floor(lugPtsTotal / 4);
+                for (const lug of lugPositions) {
+                    const lugRect = addRectPath(lug.lx, lug.ly, lug.lw / 2, lug.lh / 2, lug.lw * 0.3, lugPtsEach);
+                    pts = pts.concat(lugRect);
+                }
+
+                while (pts.length < totalPoints) {
+                    const ri = Math.floor(Math.random() * pts.length);
+                    pts.push({ x: pts[ri].x, y: pts[ri].y });
+                }
+                if (pts.length > totalPoints) pts.length = totalPoints;
+                return pts;
+            }
+
+            const watchOutlineCache = getWatchOutlinePoints();
+
+            function drawFrame(timestamp) {
+                if (!startTime) startTime = timestamp;
+                let elapsed = (timestamp - startTime) / 1000;
+                if (elapsed > TOTAL_DURATION) elapsed = TOTAL_DURATION;
+
+                ctx.clearRect(0, 0, W, H);
+                ctx.fillStyle = '#000000';
+                ctx.fillRect(0, 0, W, H);
+
+                const t = elapsed;
+
+                // ============ STAGE 0: ORIGIN (0-1s) ============
+                if (t <= 1.0) {
+                    const st = t;
+                    const dotAlpha = clamp(1 - st * 0.3, 0.4, 1);
+                    ctx.fillStyle = `rgba(255,255,255,${dotAlpha})`;
+                    const dotSize = R * 0.025 * (1 + 0.3 * Math.sin(st * Math.PI * 2.5) * Math.max(0, 1 - st));
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, dotSize, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    const pulseCount = 3;
+                    for (let p = 0; p < pulseCount; p++) {
+                        const pulseStart = p * 0.28;
+                        const pulseProgress = (st - pulseStart) / 0.35;
+                        if (pulseProgress > 0 && pulseProgress < 1.0) {
+                            const ringR = R * 0.02 + pulseProgress * R * 0.55;
+                            const ringAlpha = (1 - pulseProgress) * 0.8 * (1 - pulseProgress);
+                            const thickness = lerp(1.8, 0.3, pulseProgress);
+                            drawPulsingRing(cx, cy, ringR, ringAlpha, thickness);
+                            if (pulseProgress < 0.6) {
+                                const ring2R = ringR * 0.7;
+                                const ring2Alpha = ringAlpha * 0.5;
+                                drawPulsingRing(cx, cy, ring2R, ring2Alpha, thickness * 0.7);
+                            }
+                        }
+                    }
+                }
+
+                // ============ STAGE 1: LINE (1-2s) ============
+                if (t >= 0.95 && t <= 2.05) {
+                    const st = clamp((t - 0.95) / 0.1, 0, 1);
+                    const st2 = clamp((t - 1.0) / 1.0, 0, 1);
+                    const lineProgress = easeOut(st2);
+                    const lineHalfWidth = lerp(R * 0.02, R * 0.85, lineProgress);
+                    const lineAlpha = lerp(0.4, 1, st);
+                    ctx.strokeStyle = `rgba(255,255,255,${lineAlpha})`;
+                    ctx.lineWidth = 1.0;
+                    ctx.lineCap = 'round';
+                    ctx.beginPath();
+                    ctx.moveTo(cx - lineHalfWidth, cy);
+                    ctx.lineTo(cx + lineHalfWidth, cy);
+                    ctx.stroke();
+                    if (t < 1.0 && t > 0.9) {
+                        const dotRemain = 1 - st;
+                        ctx.fillStyle = `rgba(255,255,255,${dotRemain * 0.7})`;
+                        ctx.beginPath();
+                        ctx.arc(cx, cy, R * 0.018 * dotRemain, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+
+                // ============ STAGE 2-3: GRID proliferation (2-3s) ============
+                if (t >= 2.0 && t <= 3.0) {
+                    const st = (t - 2.0) / 1.0;
+                    const numLinesEach = 9;
+                    const totalLines = numLinesEach * 2;
+                    const baseSpacing = R * 1.7 / (numLinesEach - 1);
+                    const appearOrderH = [];
+                    const appearOrderV = [];
+                    const mid = Math.floor(numLinesEach / 2);
+                    for (let i = 0; i < numLinesEach; i++) {
+                        const dist = Math.abs(i - mid);
+                        appearOrderH.push({ index: i, dist: dist, delay: dist * 0.08 });
+                        appearOrderV.push({ index: i, dist: dist, delay: dist * 0.08 + 0.04 });
+                    }
+                    appearOrderH.sort((a, b) => a.delay - b.delay);
+                    appearOrderV.sort((a, b) => a.delay - b.delay);
+
+                    for (const ao of appearOrderH) {
+                        const i = ao.index;
+                        const lineSt = clamp((st - ao.delay) / 0.25, 0, 1);
+                        if (lineSt > 0) {
+                            const alpha = smoothstep(lineSt);
+                            const y = cy - R * 0.85 + i * baseSpacing;
+                            const hw = lerp(0, R * 0.85, easeOut(lineSt));
+                            ctx.strokeStyle = `rgba(255,255,255,${alpha})`;
+                            ctx.lineWidth = 0.8;
+                            ctx.beginPath();
+                            ctx.moveTo(cx - hw, y);
+                            ctx.lineTo(cx + hw, y);
+                            ctx.stroke();
+                        }
+                    }
+                    for (const ao of appearOrderV) {
+                        const i = ao.index;
+                        const lineSt = clamp((st - ao.delay) / 0.25, 0, 1);
+                        if (lineSt > 0) {
+                            const alpha = smoothstep(lineSt);
+                            const x = cx - R * 0.85 + i * baseSpacing;
+                            const vh = lerp(0, R * 0.85, easeOut(lineSt));
+                            ctx.strokeStyle = `rgba(255,255,255,${alpha})`;
+                            ctx.lineWidth = 0.8;
+                            ctx.beginPath();
+                            ctx.moveTo(x, cy - vh);
+                            ctx.lineTo(x, cy + vh);
+                            ctx.stroke();
+                        }
+                    }
+                }
+
+                // ============ STAGE 3-4: GRID → CIRCLE扭曲 (3-4s) ============
+                if (t >= 3.0 && t <= 4.05) {
+                    const st = clamp((t - 3.0) / 1.0, 0, 1);
+                    const numLinesEach = 9;
+                    const baseSpacing = R * 1.7 / (numLinesEach - 1);
+                    const mid = Math.floor(numLinesEach / 2);
+                    const targetCircleR = R * 0.7;
+
+                    for (let i = 0; i < numLinesEach; i++) {
+                        const y0 = cy - R * 0.85 + i * baseSpacing;
+                        const distFromCenter = Math.abs(i - mid) / mid;
+                        const bendAmount = easeInOut(st) * distFromCenter;
+                        const alpha = 1 - bendAmount * 0.15;
+                        const hw = R * 0.85;
+                        ctx.strokeStyle = `rgba(255,255,255,${alpha})`;
+                        ctx.lineWidth = lerp(0.8, 0.6, st);
+                        ctx.beginPath();
+                        const segments = 80;
+                        for (let s = 0; s <= segments; s++) {
+                            const frac = s / segments;
+                            const sx = cx - hw + frac * hw * 2;
+                            const sy = y0;
+                            const dx = sx - cx;
+                            const dy = sy - cy;
+                            const dist = Math.sqrt(dx * dx + dy * dy);
+                            const angle = Math.atan2(dy, dx);
+                            const circleX = cx + targetCircleR * Math.cos(angle);
+                            const circleY = cy + targetCircleR * Math.sin(angle);
+                            const bx = lerp(sx, circleX, bendAmount);
+                            const by = lerp(sy, circleY, bendAmount);
+                            if (s === 0) ctx.moveTo(bx, by);
+                            else ctx.lineTo(bx, by);
+                        }
+                        ctx.stroke();
+                    }
+                    for (let i = 0; i < numLinesEach; i++) {
+                        const x0 = cx - R * 0.85 + i * baseSpacing;
+                        const distFromCenter = Math.abs(i - mid) / mid;
+                        const bendAmount = easeInOut(st) * distFromCenter;
+                        const alpha = 1 - bendAmount * 0.15;
+                        const vh = R * 0.85;
+                        ctx.strokeStyle = `rgba(255,255,255,${alpha})`;
+                        ctx.lineWidth = lerp(0.8, 0.6, st);
+                        ctx.beginPath();
+                        const segments = 80;
+                        for (let s = 0; s <= segments; s++) {
+                            const frac = s / segments;
+                            const sx = x0;
+                            const sy = cy - vh + frac * vh * 2;
+                            const dx = sx - cx;
+                            const dy = sy - cy;
+                            const dist = Math.sqrt(dx * dx + dy * dy);
+                            const angle = Math.atan2(dy, dx);
+                            const circleX = cx + targetCircleR * Math.cos(angle);
+                            const circleY = cy + targetCircleR * Math.sin(angle);
+                            const bx = lerp(sx, circleX, bendAmount);
+                            const by = lerp(sy, circleY, bendAmount);
+                            if (s === 0) ctx.moveTo(bx, by);
+                            else ctx.lineTo(bx, by);
+                        }
+                        ctx.stroke();
+                    }
+                    if (st > 0.7) {
+                        const circleAlpha = (st - 0.7) / 0.3;
+                        ctx.strokeStyle = `rgba(255,255,255,${circleAlpha})`;
+                        ctx.lineWidth = 1.2;
+                        ctx.beginPath();
+                        ctx.arc(cx, cy, targetCircleR, 0, Math.PI * 2);
+                        ctx.stroke();
+                    }
+                }
+
+                // ============ STAGE 4-6: 3D线框球体 → 实体球 (4-6s) ============
+                if (t >= 4.0 && t <= 6.05) {
+                    const st = clamp((t - 4.0) / 2.0, 0, 1);
+                    const rotY = st * Math.PI * 2.5;
+                    const sphereR = R * 0.68;
+                    const wireframeAlpha = clamp(1 - st * 2.2, 0, 1);
+                    const solidAlpha = clamp((st - 0.35) * 2.5, 0, 1);
+
+                    if (wireframeAlpha > 0.01) {
+                        const numMeridians = 16;
+                        const numParallels = 12;
+                        for (let m = 0; m < numMeridians; m++) {
+                            const phi = (m / numMeridians) * Math.PI * 2;
+                            ctx.strokeStyle = `rgba(255,255,255,${wireframeAlpha * 0.7})`;
+                            ctx.lineWidth = 0.5;
+                            ctx.beginPath();
+                            const pts = 100;
+                            for (let i = 0; i <= pts; i++) {
+                                const theta = -Math.PI / 2 + (i / pts) * Math.PI;
+                                const sp = getSpherePoint(theta, phi, rotY);
+                                const proj = project3D(sp.x * sphereR / R, sp.y * sphereR / R, sp.z * sphereR / R);
+                                if (i === 0) ctx.moveTo(proj.x, proj.y);
+                                else ctx.lineTo(proj.x, proj.y);
+                            }
+                            ctx.stroke();
+                        }
+                        for (let p = 0; p < numParallels; p++) {
+                            const theta = -Math.PI / 2 + Math.PI / 3 + (p / (numParallels - 1)) * (Math.PI - 2 * Math.PI / 3);
+                            ctx.strokeStyle = `rgba(255,255,255,${wireframeAlpha * 0.6})`;
+                            ctx.lineWidth = 0.5;
+                            ctx.beginPath();
+                            const pts = 120;
+                            for (let i = 0; i <= pts; i++) {
+                                const phi = (i / pts) * Math.PI * 2;
+                                const sp = getSpherePoint(theta, phi, rotY);
+                                const proj = project3D(sp.x * sphereR / R, sp.y * sphereR / R, sp.z * sphereR / R);
+                                if (i === 0) ctx.moveTo(proj.x, proj.y);
+                                else ctx.lineTo(proj.x, proj.y);
+                            }
+                            ctx.stroke();
+                        }
+                    }
+
+                    if (solidAlpha > 0.01) {
+                        const highlightX = cx - sphereR * 0.35;
+                        const highlightY = cy - sphereR * 0.4;
+                        const grad = ctx.createRadialGradient(highlightX, highlightY, sphereR * 0.08, cx, cy, sphereR *
+                            1.05);
+                        grad.addColorStop(0, `rgba(255,255,255,${solidAlpha})`);
+                        grad.addColorStop(0.25, `rgba(255,255,255,${solidAlpha * 0.95})`);
+                        grad.addColorStop(0.5, `rgba(240,240,240,${solidAlpha * 0.75})`);
+                        grad.addColorStop(0.75, `rgba(200,200,200,${solidAlpha * 0.4})`);
+                        grad.addColorStop(0.9, `rgba(140,140,140,${solidAlpha * 0.15})`);
+                        grad.addColorStop(1, `rgba(80,80,80,${solidAlpha * 0.02})`);
+                        ctx.fillStyle = grad;
+                        ctx.beginPath();
+                        ctx.arc(cx, cy, sphereR, 0, Math.PI * 2);
+                        ctx.fill();
+
+                        const hlGrad = ctx.createRadialGradient(highlightX, highlightY, sphereR * 0.01, highlightX,
+                            highlightY, sphereR * 0.35);
+                        hlGrad.addColorStop(0, `rgba(255,255,255,${solidAlpha * 0.9})`);
+                        hlGrad.addColorStop(0.4, `rgba(255,255,255,${solidAlpha * 0.5})`);
+                        hlGrad.addColorStop(1, `rgba(255,255,255,0)`);
+                        ctx.fillStyle = hlGrad;
+                        ctx.beginPath();
+                        ctx.arc(highlightX, highlightY, sphereR * 0.35, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+
+                // ============ STAGE 6-8: 界面/INTERFACE (6-8s) ============
+                if (t >= 6.0 && t <= 8.05) {
+                    const st = clamp((t - 6.0) / 2.0, 0, 1);
+                    const flattenProgress = easeInOutCubic(clamp(st * 1.8, 0, 1));
+                    const uiAlpha = clamp((st - 0.25) * 3, 0, 1);
+                    const interfaceW = R * 0.65;
+                    const interfaceH = R * 1.1;
+                    const cornerRadius = R * 0.1;
+                    const currentW = lerp(R * 0.68 * 2, interfaceW, flattenProgress);
+                    const currentH = lerp(R * 0.68 * 2, interfaceH, flattenProgress);
+                    const currentCR = lerp(R * 0.68, cornerRadius, flattenProgress);
+                    const rx = cx - currentW / 2;
+                    const ry = cy - currentH / 2;
+
+                    ctx.strokeStyle = `rgba(255,255,255,${clamp(flattenProgress, 0.3, 1)})`;
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath();
+                    ctx.moveTo(rx + currentCR, ry);
+                    ctx.lineTo(rx + currentW - currentCR, ry);
+                    ctx.arcTo(rx + currentW, ry, rx + currentW, ry + currentCR, currentCR);
+                    ctx.lineTo(rx + currentW, ry + currentH - currentCR);
+                    ctx.arcTo(rx + currentW, ry + currentH, rx + currentW - currentCR, ry + currentH, currentCR);
+                    ctx.lineTo(rx + currentCR, ry + currentH);
+                    ctx.arcTo(rx, ry + currentH, rx, ry + currentH - currentCR, currentCR);
+                    ctx.lineTo(rx, ry + currentCR);
+                    ctx.arcTo(rx, ry, rx + currentCR, ry, currentCR);
+                    ctx.closePath();
+                    ctx.stroke();
+
+                    if (uiAlpha > 0.01 && flattenProgress > 0.6) {
+                        const alpha = uiAlpha * clamp((flattenProgress - 0.6) / 0.4, 0, 1);
+                        const uirx = rx + currentW * 0.08;
+                        const uiry = ry + currentH * 0.06;
+                        const uiw = currentW * 0.84;
+                        const uih = currentH * 0.88;
+                        const uicr = currentCR * 0.7;
+
+                        ctx.strokeStyle = `rgba(255,255,255,${alpha * 0.8})`;
+                        ctx.lineWidth = 0.7;
+                        const statusY = uiry + uih * 0.06;
+                        ctx.beginPath();
+                        ctx.moveTo(uirx + uiw * 0.02, statusY);
+                        ctx.lineTo(uirx + uiw * 0.35, statusY);
+                        ctx.stroke();
+                        const timeX = uirx + uiw * 0.65;
+                        ctx.beginPath();
+                        ctx.arc(timeX, statusY, uih * 0.025, 0, Math.PI * 2);
+                        ctx.stroke();
+                        const battX = uirx + uiw * 0.82;
+                        ctx.strokeRect(battX, statusY - uih * 0.018, uiw * 0.06, uih * 0.036);
+                        ctx.fillStyle = `rgba(255,255,255,${alpha * 0.7})`;
+                        ctx.fillRect(battX + uiw * 0.06, statusY - uih * 0.008, uiw * 0.01, uih * 0.016);
+
+                        const iconGridStartY = uiry + uih * 0.15;
+                        const iconSize = uiw * 0.16;
+                        const iconGap = uiw * 0.06;
+                        const iconsPerRow = 4;
+                        const iconRows = 3;
+                        const gridTotalW = iconsPerRow * iconSize + (iconsPerRow - 1) * iconGap;
+                        const gridStartX = uirx + (uiw - gridTotalW) / 2;
+                        const iconCR = iconSize * 0.22;
+                        for (let row = 0; row < iconRows; row++) {
+                            for (let col = 0; col < iconsPerRow; col++) {
+                                const ix = gridStartX + col * (iconSize + iconGap);
+                                const iy = iconGridStartY + row * (iconSize + iconGap);
+                                ctx.strokeStyle = `rgba(255,255,255,${alpha * 0.7})`;
+                                ctx.lineWidth = 0.6;
+                                ctx.beginPath();
+                                ctx.moveTo(ix + iconCR, iy);
+                                ctx.lineTo(ix + iconSize - iconCR, iy);
+                                ctx.arcTo(ix + iconSize, iy, ix + iconSize, iy + iconCR, iconCR);
+                                ctx.lineTo(ix + iconSize, iy + iconSize - iconCR);
+                                ctx.arcTo(ix + iconSize, iy + iconSize, ix + iconSize - iconCR, iy + iconSize, iconCR);
+                                ctx.lineTo(ix + iconCR, iy + iconSize);
+                                ctx.arcTo(ix, iy + iconSize, ix, iy + iconSize - iconCR, iconCR);
+                                ctx.lineTo(ix, iy + iconCR);
+                                ctx.arcTo(ix, iy, ix + iconCR, iy, iconCR);
+                                ctx.closePath();
+                                ctx.stroke();
+                                if (row === 0 && col === 0) {
+                                    ctx.fillStyle = `rgba(255,255,255,${alpha * 0.2})`;
+                                    ctx.fill();
+                                }
+                            }
+                        }
+
+                        const homeBarY = uiry + uih * 0.9;
+                        const homeBarW = uiw * 0.35;
+                        const homeBarH = uih * 0.012;
+                        ctx.strokeStyle = `rgba(255,255,255,${alpha * 0.9})`;
+                        ctx.lineWidth = homeBarH;
+                        ctx.beginPath();
+                        ctx.moveTo(uirx + (uiw - homeBarW) / 2, homeBarY);
+                        ctx.lineTo(uirx + (uiw + homeBarW) / 2, homeBarY);
+                        ctx.stroke();
+                        ctx.lineWidth = 1;
+                    }
+                }
+
+                // ============ STAGE 8-10: 立方体→绽放 (8-10s) ============
+                if (t >= 8.0 && t <= 10.05) {
+                    const st = clamp((t - 8.0) / 2.0, 0, 1);
+                    const foldProgress = clamp(st * 2.5, 0, 1);
+                    const bloomProgress = clamp((st - 0.45) * 2.5, 0, 1);
+                    const cubeSize = R * 0.55;
+                    const isoAngle = Math.PI / 6;
+                    const cosA = Math.cos(isoAngle);
+                    const sinA = Math.sin(isoAngle);
+
+                    const cubeCenterX = cx;
+                    const cubeCenterY = cy;
+                    const flipAngle = foldProgress * Math.PI;
+
+                    const faceDefs = [
+                        { nx: 0, ny: 0, nz: 1, ox: 0, oy: 0, oz: cubeSize / 2 },
+                        { nx: 0, ny: 0, nz: -1, ox: 0, oy: 0, oz: -cubeSize / 2 },
+                        { nx: 1, ny: 0, nz: 0, ox: cubeSize / 2, oy: 0, oz: 0 },
+                        { nx: -1, ny: 0, nz: 0, ox: -cubeSize / 2, oy: 0, oz: 0 },
+                        { nx: 0, ny: 1, nz: 0, ox: 0, oy: cubeSize / 2, oz: 0 },
+                        { nx: 0, ny: -1, nz: 0, ox: 0, oy: -cubeSize / 2, oz: 0 },
+                    ];
+
+                    const cosF = Math.cos(flipAngle);
+                    const sinF = Math.sin(flipAngle);
+
+                    function rotateY(vx, vy, vz, angle) {
+                        const c = Math.cos(angle);
+                        const s = Math.sin(angle);
+                        return { x: vx * c - vz * s, y: vy, z: vx * s + vz * c };
+                    }
+
+                    function isoProject(vx, vy, vz) {
+                        const rx = (vx - vz) * cosA;
+                        const ry = -vy + (vx + vz) * sinA;
+                        return { x: cubeCenterX + rx, y: cubeCenterY + ry };
+                    }
+
+                    if (foldProgress < 0.9 && bloomProgress < 0.3) {
+                        const alpha = 1 - bloomProgress * 3;
+                        ctx.strokeStyle = `rgba(255,255,255,${alpha})`;
+                        ctx.lineWidth = 0.9;
+                        const halfS = cubeSize / 2;
+                        const corners = [
+                            { x: -halfS, y: -halfS, z: -halfS }, { x: halfS, y: -halfS, z: -halfS },
+                            { x: halfS, y: halfS, z: -halfS }, { x: -halfS, y: halfS, z: -halfS },
+                            { x: -halfS, y: -halfS, z: halfS }, { x: halfS, y: -halfS, z: halfS },
+                            { x: halfS, y: halfS, z: halfS }, { x: -halfS, y: halfS, z: halfS },
+                        ];
+                        const edges = [
+                            [0, 1],
+                            [1, 2],
+                            [2, 3],
+                            [3, 0],
+                            [4, 5],
+                            [5, 6],
+                            [6, 7],
+                            [7, 4],
+                            [0, 4],
+                            [1, 5],
+                            [2, 6],
+                            [3, 7]
+                        ];
+                        for (const [a, b] of edges) {
+                            const ca = corners[a];
+                            const cb = corners[b];
+                            const ra = rotateY(ca.x, ca.y, ca.z, flipAngle);
+                            const rb = rotateY(cb.x, cb.y, cb.z, flipAngle);
+                            const pa = isoProject(ra.x, ra.y, ra.z);
+                            const pb = isoProject(rb.x, rb.y, rb.z);
+                            ctx.beginPath();
+                            ctx.moveTo(pa.x, pa.y);
+                            ctx.lineTo(pb.x, pb.y);
+                            ctx.stroke();
+                        }
+                    }
+
+                    if (bloomProgress > 0.05) {
+                        const bp = clamp(bloomProgress, 0, 1);
+                        const petalAlpha = clamp(bp * 1.5, 0, 1);
+                        const spreadDist = bp * R * 0.7;
+                        const petalScale = lerp(0.3, 1.1, easeOut(bp));
+
+                        for (let f = 0; f < 6; f++) {
+                            const fd = faceDefs[f];
+                            const ro = rotateY(fd.ox, fd.oy, fd.oz, flipAngle);
+                            const rn = rotateY(fd.nx, fd.ny, fd.nz, flipAngle);
+                            const faceCenter = isoProject(ro.x, ro.y, ro.z);
+                            const tx = faceCenter.x + rn.x * spreadDist;
+                            const ty = faceCenter.y + rn.y * spreadDist;
+                            const petalW = cubeSize * 0.55 * petalScale;
+                            const petalH = cubeSize * 0.7 * petalScale;
+                            const angle = Math.atan2(rn.y, rn.x) + bp * 0.5;
+                            ctx.save();
+                            ctx.translate(tx, ty);
+                            ctx.rotate(angle);
+                            ctx.strokeStyle = `rgba(255,255,255,${petalAlpha})`;
+                            ctx.lineWidth = 0.7;
+                            ctx.beginPath();
+                            ctx.ellipse(0, 0, petalW, petalH, 0, 0, Math.PI * 2);
+                            ctx.stroke();
+                            if (bp > 0.35) {
+                                const fillAlpha = (bp - 0.35) * 1.5 * petalAlpha;
+                                const petalGrad = ctx.createRadialGradient(-petalW * 0.2, -petalH * 0.25, petalW * 0.05,
+                                    0, 0, Math.max(petalW, petalH));
+                                petalGrad.addColorStop(0, `rgba(255,255,255,${fillAlpha * 0.7})`);
+                                petalGrad.addColorStop(0.5, `rgba(255,255,255,${fillAlpha * 0.3})`);
+                                petalGrad.addColorStop(1, 'rgba(255,255,255,0)');
+                                ctx.fillStyle = petalGrad;
+                                ctx.fill();
+                            }
+                            ctx.restore();
+                        }
+                    }
+                }
+
+                // ============ STAGE 10-12: 涡流/VORTEX (10-12s) ============
+                if (t >= 10.0 && t <= 12.05) {
+                    const st = clamp((t - 10.0) / 2.0, 0, 1);
+                    const vortexStrength = clamp(st * 1.5, 0, 1);
+                    const ellipseA = R * 0.55 * (1 + st * 0.3);
+                    const ellipseB = R * 0.35 * (1 + st * 0.2);
+                    const ellipseTilt = st * Math.PI * 0.4;
+
+                    for (let i = 0; i < NUM_PARTICLES; i++) {
+                        const p = particles[i];
+                        const orbitIdx = i % 12;
+                        const orbitR = 0.15 + (orbitIdx / 11) * 0.85;
+                        const a = ellipseA * orbitR;
+                        const b = ellipseB * orbitR;
+                        const speed = (0.4 + orbitIdx * 0.15) * (p.clockwise ? 1 : -1);
+                        const angle = p.phase + st * Math.PI * 4 * speed;
+                        const px = cx + a * Math.cos(angle) * Math.cos(ellipseTilt) - b * Math.sin(angle) * Math.sin(
+                            ellipseTilt);
+                        const py = cy + a * Math.cos(angle) * Math.sin(ellipseTilt) + b * Math.sin(angle) * Math.cos(
+                            ellipseTilt);
+                        p.currentX = px;
+                        p.currentY = py;
+                        const flickerAlpha = 0.5 + 0.5 * Math.sin(st * 20 + i * 0.7) * 0.3 + 0.7;
+                        const alpha = vortexStrength * flickerAlpha;
+                        ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+                        ctx.beginPath();
+                        ctx.arc(px, py, p.size * 0.7, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+
+                // ============ STAGE 12-13: 手表/WATCH (12-13s) ============
+                if (t >= 12.0 && t <= 13.05) {
+                    const st = clamp((t - 12.0) / 1.0, 0, 1);
+                    const convergence = easeInOutCubic(st);
+                    const watchPts = watchOutlineCache;
+
+                    for (let i = 0; i < NUM_PARTICLES; i++) {
+                        const p = particles[i];
+                        const targetIdx = Math.floor((i / NUM_PARTICLES) * watchPts.length);
+                        const target = watchPts[Math.min(targetIdx, watchPts.length - 1)];
+                        const tx = lerp(p.currentX, target.x, convergence);
+                        const ty = lerp(p.currentY, target.y, convergence);
+                        const alpha = 0.6 + 0.4 * convergence;
+                        ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+                        ctx.beginPath();
+                        ctx.arc(tx, ty, p.size * 0.6, 0, Math.PI * 2);
+                        ctx.fill();
+                        if (st > 0.8) {
+                            p.currentX = tx;
+                            p.currentY = ty;
+                        }
+                    }
+                    if (st > 0.7) {
+                        const solidifyAlpha = (st - 0.7) / 0.3;
+                        ctx.strokeStyle = `rgba(255,255,255,${solidifyAlpha * 0.4})`;
+                        ctx.lineWidth = 0.6;
+                        ctx.setLineDash([2, 2]);
+                        const firstPt = watchPts[0];
+                        ctx.beginPath();
+                        ctx.moveTo(firstPt.x, firstPt.y);
+                        for (let i = 1; i < watchPts.length; i += 3) {
+                            ctx.lineTo(watchPts[i].x, watchPts[i].y);
+                        }
+                        ctx.closePath();
+                        ctx.stroke();
+                        ctx.setLineDash([]);
+                    }
+                }
+
+                // ============ STAGE 13-14: 坍缩/COLLAPSE (13-14s) ============
+                if (t >= 13.0 && t <= 14.05) {
+                    const st = clamp((t - 13.0) / 1.0, 0, 1);
+                    const dissolvePhase = clamp(st * 2.5, 0, 1);
+                    const compressPhase = clamp((st - 0.35) * 3, 0, 1);
+                    const pulsePhase = clamp((st - 0.55) * 3, 0, 1);
+                    const collapsePhase = clamp((st - 0.7) * 4, 0, 1);
+
+                    const ribbonAlpha = 1 - dissolvePhase;
+                    const sphereR = lerp(R * 0.55, R * 0.15, compressPhase);
+                    const sphereAlpha = clamp(compressPhase * 1.5, 0, 1);
+                    const pulseBrightness = pulsePhase > 0 && pulsePhase < 1 ? 1 + Math.sin(pulsePhase * Math.PI) * 0.6 :
+                        1;
+                    const collapseR = lerp(R * 0.15, R * 0.015, collapsePhase);
+                    const finalR = collapsePhase > 0.8 ? collapseR : (compressPhase > 0.1 ? sphereR * pulseBrightness :
+                        sphereR);
+
+                    if (ribbonAlpha > 0.01 && dissolvePhase < 0.8) {
+                        for (let i = 0; i < NUM_PARTICLES; i++) {
+                            const p = particles[i];
+                            const spiralAngle = p.phase + dissolvePhase * Math.PI * 6;
+                            const spiralR = lerp(R * 0.7, R * 0.05, dissolvePhase) * (0.5 + 0.5 * (i / NUM_PARTICLES));
+                            const sx = cx + spiralR * Math.cos(spiralAngle);
+                            const sy = cy + spiralR * Math.sin(spiralAngle);
+                            const alpha = ribbonAlpha * (0.4 + 0.6 * (1 - dissolvePhase));
+                            ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+                            ctx.beginPath();
+                            ctx.arc(sx, sy, p.size * 0.5, 0, Math.PI * 2);
+                            ctx.fill();
+                        }
+                    }
+
+                    if (compressPhase > 0.05 && collapsePhase < 0.6) {
+                        const sr = compressPhase > 0.5 ? sphereR * pulseBrightness : sphereR;
+                        const gradR = Math.max(sr, R * 0.02);
+                        const grad = ctx.createRadialGradient(cx, cy, gradR * 0.05, cx, cy, gradR);
+                        const ba = sphereAlpha * (compressPhase > 0.5 ? pulseBrightness : 1);
+                        grad.addColorStop(0, `rgba(255,255,255,${ba})`);
+                        grad.addColorStop(0.6, `rgba(255,255,255,${ba * 0.7})`);
+                        grad.addColorStop(1, `rgba(255,255,255,0)`);
+                        ctx.fillStyle = grad;
+                        ctx.beginPath();
+                        ctx.arc(cx, cy, gradR, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+
+                    if (collapsePhase > 0.3) {
+                        const cr = collapseR;
+                        const ca = clamp(collapsePhase, 0, 1);
+                        const brightGrad = ctx.createRadialGradient(cx, cy, cr * 0.01, cx, cy, cr * 1.5);
+                        brightGrad.addColorStop(0, `rgba(255,255,255,${ca})`);
+                        brightGrad.addColorStop(0.3, `rgba(255,255,255,${ca * 0.8})`);
+                        brightGrad.addColorStop(1, 'rgba(255,255,255,0)');
+                        ctx.fillStyle = brightGrad;
+                        ctx.beginPath();
+                        ctx.arc(cx, cy, cr * 1.5, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.fillStyle = `rgba(255,255,255,${ca})`;
+                        ctx.beginPath();
+                        ctx.arc(cx, cy, cr, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+
+                // ============ STAGE 14-15: LOGO (14-15s) ============
+                if (t >= 14.0 && t <= 15.0) {
+                    const st = clamp((t - 14.0) / 1.0, 0, 1);
+                    const holdPhase = clamp(st * 2.5, 0, 1);
+                    const expandPhase = clamp((st - 0.25) * 3, 0, 1);
+                    const glowPhase = clamp((st - 0.45) * 3, 0, 1);
+                    const glowFade = clamp(1 - (st - 0.65) * 4, 0, 1);
+
+                    if (holdPhase < 0.9 && expandPhase < 0.3) {
+                        const dotAlpha = 1 - holdPhase;
+                        const dotR = R * 0.018;
+                        ctx.fillStyle = `rgba(255,255,255,${dotAlpha})`;
+                        ctx.beginPath();
+                        ctx.arc(cx, cy, dotR, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+
+                    if (expandPhase > 0.01) {
+                        const logoAlpha = clamp(expandPhase * 1.3, 0, 1);
+                        const logoScale = lerp(0.3, 1.0, easeOutBack(clamp(expandPhase, 0, 1)));
+                        ctx.save();
+                        ctx.translate(cx, cy);
+                        ctx.scale(logoScale, logoScale);
+                        ctx.fillStyle = `rgba(255,255,255,${logoAlpha})`;
+                        ctx.font = `${R * 0.28}px "Helvetica Neue", "SF Pro Display", "Segoe UI", Arial, sans-serif`;
+                        ctx.fontWeight = '300';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.letterSpacing = '0.12em';
+                        const logoText = 'AETHER';
+                        ctx.fillText(logoText, 0, 0);
+                        ctx.restore();
+                    }
+
+                    if (glowPhase > 0.01 && glowFade > 0.01) {
+                        const glowRadius = R * 0.25 + glowPhase * R * 0.7;
+                        const glowAlpha = glowPhase * glowFade * 0.7;
+                        drawGlow(cx, cy, glowRadius, 'rgba(255,140,30,0.9)', glowAlpha);
+                        if (glowPhase > 0.4) {
+                            const innerGlowR = glowRadius * 0.5;
+                            drawGlow(cx, cy, innerGlowR, 'rgba(255,180,80,0.8)', glowAlpha * 0.8);
+                        }
+                    }
+
+                    if (expandPhase > 0.3 && glowFade < 0.9) {
+                        const textAlpha = clamp(expandPhase, 0.3, 1) * clamp(glowFade + 0.3, 0.3, 1);
+                        ctx.save();
+                        ctx.translate(cx, cy);
+                        const ts = lerp(0.3, 1.0, easeOutBack(clamp(expandPhase, 0, 1)));
+                        ctx.scale(ts, ts);
+                        ctx.fillStyle = `rgba(255,255,255,${textAlpha})`;
+                        ctx.font = `${R * 0.28}px "Helvetica Neue", "SF Pro Display", "Segoe UI", Arial, sans-serif`;
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText('AETHER', 0, 0);
+                        ctx.restore();
+                    }
+                }
+
+                if (t >= 15.0) {
+                    ctx.fillStyle = 'rgba(255,255,255,1)';
+                    ctx.font = `${R * 0.28}px "Helvetica Neue", "SF Pro Display", "Segoe UI", Arial, sans-serif`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('AETHER', cx, cy);
+                }
+
+                if (elapsed < TOTAL_DURATION) {
+                    animationId = requestAnimationFrame(drawFrame);
+                } else {
+                    ctx.fillStyle = '#000000';
+                    ctx.fillRect(0, 0, W, H);
+                    ctx.fillStyle = 'rgba(255,255,255,1)';
+                    ctx.font = `${R * 0.28}px "Helvetica Neue", "SF Pro Display", "Segoe UI", Arial, sans-serif`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('AETHER', cx, cy);
+                }
+            }
+
+            function initParticles() {
+                for (let i = 0; i < NUM_PARTICLES; i++) {
+                    const p = particles[i];
+                    p.phase = Math.random() * Math.PI * 2;
+                    p.clockwise = i % 3 === 0 ? false : true;
+                    p.orbitSpeed = 0.5 + Math.random() * 1.5;
+                    p.currentX = cx;
+                    p.currentY = cy;
+                    p.size = 1.0 + Math.random() * 1.0;
+                }
+            }
+            initParticles();
+
+            resize();
+            animationId = requestAnimationFrame(drawFrame);
+
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'r' || e.key === 'R') {
+                    startTime = null;
+                    initParticles();
+                    resize();
+                    if (animationId) cancelAnimationFrame(animationId);
+                    animationId = requestAnimationFrame(drawFrame);
+                }
+            });
+
+            canvas.addEventListener('click', function() {
+                startTime = null;
+                initParticles();
+                resize();
+                if (animationId) cancelAnimationFrame(animationId);
+                animationId = requestAnimationFrame(drawFrame);
+            });
+        })();
+    </script>
+</body>
+</html>

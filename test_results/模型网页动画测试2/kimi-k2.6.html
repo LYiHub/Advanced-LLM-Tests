@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Motion Design Sequence</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        html, body {
+            width: 100%;
+            height: 100%;
+            background: #000000;
+            overflow: hidden;
+        }
+        
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        #canvas {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            background: #000000;
+        }
+        
+        svg {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 100%;
+            height: 100%;
+            max-width: 800px;
+            max-height: 800px;
+        }
+        
+        .layer {
+            opacity: 0;
+            transition: opacity 0.05s linear;
+        }
+        
+        .layer.active {
+            opacity: 1;
+        }
+        
+        #particles-layer {
+            opacity: 1;
+        }
+        
+        @keyframes pulse-glow {
+            0% { opacity: 0; transform: scale(0); }
+            20% { opacity: 1; transform: scale(1); }
+            100% { opacity: 0; transform: scale(2); }
+        }
+        
+        @keyframes line-extend {
+            0% { stroke-dashoffset: 0; }
+            100% { stroke-dashoffset: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas">
+        <svg id="main-svg" viewBox="-400 -300 800 600" preserveAspectRatio="xMidYMid meet">
+            <defs>
+                <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+                    <feGaussianBlur stdDeviation="3" result="blur"/>
+                    <feMerge>
+                        <feMergeNode in="blur"/>
+                        <feMergeNode in="SourceGraphic"/>
+                    </feMerge>
+                </filter>
+                <radialGradient id="sphere-grad" cx="35%" cy="30%" r="60%">
+                    <stop offset="0%" style="stop-color:#ffffff;stop-opacity:1" />
+                    <stop offset="40%" style="stop-color:#f8f8f8;stop-opacity:1" />
+                    <stop offset="100%" style="stop-color:#e0e0e0;stop-opacity:1" />
+                </radialGradient>
+                <radialGradient id="amber-glow" cx="50%" cy="50%" r="50%">
+                    <stop offset="0%" style="stop-color:#ff9f43;stop-opacity:0.6" />
+                    <stop offset="50%" style="stop-color:#ff9f43;stop-opacity:0.2" />
+                    <stop offset="100%" style="stop-color:#ff9f43;stop-opacity:0" />
+                </radialGradient>
+            </defs>
+            
+            <g id="origin-layer" class="layer">
+                <circle id="origin-dot" cx="0" cy="0" r="4" fill="#ffffff"/>
+                <circle id="pulse-1" cx="0" cy="0" r="4" fill="none" stroke="#ffffff" stroke-width="1.5"/>
+                <circle id="pulse-2" cx="0" cy="0" r="4" fill="none" stroke="#ffffff" stroke-width="1"/>
+                <circle id="pulse-3" cx="0" cy="0" r="4" fill="none" stroke="#ffffff" stroke-width="0.5"/>
+            </g>
+            
+            <g id="line-layer" class="layer">
+                <line id="center-line" x1="0" y1="0" x2="0" y2="0" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round"/>
+            </g>
+            
+            <g id="grid-layer" class="layer"></g>
+            
+            <g id="circle-layer" class="layer">
+                <circle id="final-circle" cx="0" cy="0" r="0" fill="none" stroke="#ffffff" stroke-width="1.5"/>
+            </g>
+            
+            <g id="wireframe-sphere-layer" class="layer"></g>
+            
+            <g id="solid-sphere-layer" class="layer">
+                <circle id="solid-sphere" cx="0" cy="0" r="0" fill="url(#sphere-grad)"/>
+            </g>
+            
+            <g id="interface-layer" class="layer">
+                <rect id="phone-frame" x="-70" y="-130" width="140" height="260" rx="16" fill="none" stroke="#ffffff" stroke-width="1.5"/>
+                <rect id="status-bar" x="-58" y="-118" width="116" height="8" rx="2" fill="none" stroke="#ffffff" stroke-width="0.8"/>
+                <rect id="app-icon-1" x="-58" y="-100" width="22" height="22" rx="5" fill="none" stroke="#ffffff" stroke-width="0.8"/>
+                <rect id="app-icon-2" x="-26" y="-100" width="22" height="22" rx="5" fill="none" stroke="#ffffff" stroke-width="0.8"/>
+                <rect id="app-icon-3" x="6" y="-100" width="22" height="22" rx="5" fill="none" stroke="#ffffff" stroke-width="0.8"/>
+                <rect id="app-icon-4" x="36" y="-100" width="22" height="22" rx="5" fill="none" stroke="#ffffff" stroke-width="0.8"/>
+                <rect id="app-icon-5" x="-58" y="-68" width="22" height="22" rx="5" fill="none" stroke="#ffffff" stroke-width="0.8"/>
+                <rect id="app-icon-6" x="-26" y="-68" width="22" height="22" rx="5" fill="none" stroke="#ffffff" stroke-width="0.8"/>
+                <rect id="app-icon-7" x="6" y="-68" width="22" height="22" rx="5" fill="none" stroke="#ffffff" stroke-width="0.8"/>
+                <rect id="app-icon-8" x="36" y="-68" width="22" height="22" rx="5" fill="none" stroke="#ffffff" stroke-width="0.8"/>
+                <rect id="app-icon-9" x="-58" y="-36" width="22" height="22" rx="5" fill="none" stroke="#ffffff" stroke-width="0.8"/>
+                <rect id="app-icon-10" x="-26" y="-36" width="22" height="22" rx="5" fill="none" stroke="#ffffff" stroke-width="0.8"/>
+                <rect id="app-icon-11" x="6" y="-36" width="22" height="22" rx="5" fill="none" stroke="#ffffff" stroke-width="0.8"/>
+                <rect id="app-icon-12" x="36" y="-36" width="22" height="22" rx="5" fill="none" stroke="#ffffff" stroke-width="0.8"/>
+                <rect id="home-bar" x="-16" y="112" width="32" height="3" rx="1.5" fill="#ffffff"/>
+            </g>
+            
+            <g id="cube-layer" class="layer"></g>
+            
+            <g id="flower-layer" class="layer"></g>
+            
+            <g id="particles-layer" class="layer"></g>
+            
+            <g id="watch-layer" class="layer">
+                <rect id="watch-case" x="-50" y="-60" width="100" height="120" rx="14" fill="none" stroke="#ffffff" stroke-width="1.5"/>
+                <path id="watch-lug-top-left" d="M -50 -60 L -65 -75 L -50 -48 Z" fill="none" stroke="#ffffff" stroke-width="1"/>
+                <path id="watch-lug-top-right" d="M 50 -60 L 65 -75 L 50 -48 Z" fill="none" stroke="#ffffff" stroke-width="1"/>
+                <path id="watch-lug-bot-left" d="M -50 60 L -65 75 L -50 48 Z" fill="none" stroke="#ffffff" stroke-width="1"/>
+                <path id="watch-lug-bot-right" d="M 50 60 L 65 75 L 50 48 Z" fill="none" stroke="#ffffff" stroke-width="1"/>
+                <circle id="watch-crown" cx="56" cy="0" r="4" fill="none" stroke="#ffffff" stroke-width="1"/>
+            </g>
+            
+            <g id="ribbon-layer" class="layer"></g>
+            
+            <g id="logo-layer" class="layer">
+                <circle id="logo-bg" cx="0" cy="0" r="120" fill="none"/>
+                <text id="logo-text" x="0" y="8" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif" font-size="42" font-weight="300" fill="#ffffff" letter-spacing="6">LUMINA</text>
+            </g>
+            
+            <g id="glow-layer" class="layer">
+                <circle id="amber-pulse" cx="0" cy="0" r="0" fill="url(#amber-glow)"/>
+            </g>
+        </svg>
+    </div>
+
+    <script>
+        (function() {
+            const svg = document.getElementById('main-svg');
+            const layers = {
+                origin: document.getElementById('origin-layer'),
+                line: document.getElementById('line-layer'),
+                grid: document.getElementById('grid-layer'),
+                circle: document.getElementById('circle-layer'),
+                wireframeSphere: document.getElementById('wireframe-sphere-layer'),
+                solidSphere: document.getElementById('solid-sphere-layer'),
+                interface: document.getElementById('interface-layer'),
+                cube: document.getElementById('cube-layer'),
+                flower: document.getElementById('flower-layer'),
+                particles: document.getElementById('particles-layer'),
+                watch: document.getElementById('watch-layer'),
+                ribbon: document.getElementById('ribbon-layer'),
+                logo: document.getElementById('logo-layer'),
+                glow: document.getElementById('glow-layer')
+            };
+            
+            const elements = {
+                originDot: document.getElementById('origin-dot'),
+                pulse1: document.getElementById('pulse-1'),
+                pulse2: document.getElementById('pulse-2'),
+                pulse3: document.getElementById('pulse-3'),
+                centerLine: document.getElementById('center-line'),
+                finalCircle: document.getElementById('final-circle'),
+                solidSphere: document.getElementById('solid-sphere'),
+                logoText: document.getElementById('logo-text'),
+                amberPulse: document.getElementById('amber-pulse')
+            };
+            
+            function showLayer(name) {
+                Object.values(layers).forEach(l => l.classList.remove('active'));
+                if (layers[name]) layers[name].classList.add('active');
+            }
+            
+            function easeOutElastic(t) {
+                const c4 = (2 * Math.PI) / 3;
+                return t === 0 ? 0 : t === 1 ? 1 : Math.pow(2, -10 * t) * Math.sin((t * 10 - 0.75) * c4) + 1;
+            }
+            
+            function easeOutCubic(t) {
+                return 1 - Math.pow(1 - t, 3);
+            }
+            
+            function easeInOutCubic(t) {
+                return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+            }
+            
+            function easeInOutSine(t) {
+                return -(Math.cos(Math.PI * t) - 1) / 2;
+            }
+            
+            function linear(t) { return t; }
+            
+            let startTime = null;
+            let animationId = null;
+            
+            // Grid generation
+            const gridLines = [];
+            for (let i = -4; i <= 4; i++) {
+                const hLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                hLine.setAttribute('y1', i * 30);
+                hLine.setAttribute('y2', i * 30);
+                hLine.setAttribute('x1', -360);
+                hLine.setAttribute('x2', 360);
+                hLine.setAttribute('stroke', '#ffffff');
+                hLine.setAttribute('stroke-width', '0.6');
+                hLine.setAttribute('stroke-opacity', '0.9');
+                layers.grid.appendChild(hLine);
+                gridLines.push({ el: hLine, type: 'h', idx: i });
+            }
+            for (let i = -4; i <= 4; i++) {
+                const vLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                vLine.setAttribute('x1', i * 40);
+                vLine.setAttribute('x2', i * 40);
+                vLine.setAttribute('y1', -270);
+                vLine.setAttribute('y2', 270);
+                vLine.setAttribute('stroke', '#ffffff');
+                vLine.setAttribute('stroke-width', '0.6');
+                vLine.setAttribute('stroke-opacity', '0.9');
+                layers.grid.appendChild(vLine);
+                gridLines.push({ el: vLine, type: 'v', idx: i });
+            }
+            
+            // Wireframe sphere generation
+            const sphereR = 130;
+            const sphereLines = [];
+            for (let i = 0; i <= 12; i++) {
+                const lat = (i / 12) * Math.PI - Math.PI / 2;
+                const r = sphereR * Math.cos(lat);
+                const y = sphereR * Math.sin(lat);
+                const circle = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
+                circle.setAttribute('cx', 0);
+                circle.setAttribute('cy', y);
+                circle.setAttribute('rx', r);
+                circle.setAttribute('ry', r * 0.35);
+                circle.setAttribute('fill', 'none');
+                circle.setAttribute('stroke', '#ffffff');
+                circle.setAttribute('stroke-width', '0.7');
+                layers.wireframeSphere.appendChild(circle);
+                sphereLines.push({ el: circle, type: 'lat', idx: i, y: y, r: r });
+            }
+            for (let i = 0; i < 16; i++) {
+                const lng = (i / 16) * Math.PI * 2;
+                const circle = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
+                circle.setAttribute('cx', 0);
+                circle.setAttribute('cy', 0);
+                circle.setAttribute('rx', sphereR);
+                circle.setAttribute('ry', sphereR * 0.35);
+                circle.setAttribute('fill', 'none');
+                circle.setAttribute('stroke', '#ffffff');
+                circle.setAttribute('stroke-width', '0.7');
+                const rot = lng * 180 / Math.PI;
+                circle.setAttribute('transform', `rotate(${rot})`);
+                layers.wireframeSphere.appendChild(circle);
+                sphereLines.push({ el: circle, type: 'lng', idx: i, angle: lng });
+            }
+            
+            // Cube generation
+            const cubeSize = 80;
+            const cubeVertices = [
+                [-1,-1,-1], [1,-1,-1], [1,1,-1], [-1,1,-1],
+                [-1,-1,1], [1,-1,1], [1,1,1], [-1,1,1]
+            ];
+            const cubeEdges = [
+                [0,1],[1,2],[2,3],[3,0],
+                [4,5],[5,6],[6,7],[7,4],
+                [0,4],[1,5],[2,6],[3,7]
+            ];
+            const cubeLines = [];
+            cubeEdges.forEach((edge, i) => {
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                line.setAttribute('stroke', '#ffffff');
+                line.setAttribute('stroke-width', '1.2');
+                line.setAttribute('stroke-linecap', 'round');
+                layers.cube.appendChild(line);
+                cubeLines.push({ el: line, v1: edge[0], v2: edge[1] });
+            });
+            const cubeFaces = [];
+            const faceDefs = [[0,1,2,3],[4,5,6,7],[0,1,5,4],[2,3,7,6],[0,3,7,4],[1,2,6,5]];
+            faceDefs.forEach((face, i) => {
+                const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+                poly.setAttribute('fill', 'none');
+                poly.setAttribute('stroke', '#ffffff');
+                poly.setAttribute('stroke-width', '0.6');
+                poly.setAttribute('opacity', '0.3');
+                layers.cube.appendChild(poly);
+                cubeFaces.push({ el: poly, verts: face });
+            });
+            
+            // Flower petals
+            const petals = [];
+            for (let i = 0; i < 6; i++) {
+                const petal = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
+                petal.setAttribute('cx', 0);
+                petal.setAttribute('cy', 0);
+                petal.setAttribute('rx', 50);
+                petal.setAttribute('ry', 25);
+                petal.setAttribute('fill', 'none');
+                petal.setAttribute('stroke', '#ffffff');
+                petal.setAttribute('stroke-width', '1.2');
+                layers.flower.appendChild(petal);
+                petals.push({ el: petal, idx: i });
+            }
+            
+            // Particles
+            const particleCount = 250;
+            const particles = [];
+            for (let i = 0; i < particleCount; i++) {
+                const p = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                p.setAttribute('r', Math.random() * 1.5 + 0.5);
+                p.setAttribute('fill', '#ffffff');
+                layers.particles.appendChild(p);
+                particles.push({
+                    el: p,
+                    angle: Math.random() * Math.PI * 2,
+                    radius: 30 + Math.random() * 180,
+                    speed: (Math.random() * 0.8 + 0.3) * (Math.random() > 0.5 ? 1 : -1),
+                    phase: Math.random() * Math.PI * 2,
+                    blinkSpeed: Math.random() * 3 + 1
+                });
+            }
+            
+            // Watch
+            const watchParts = [
+                document.getElementById('watch-case'),
+                document.getElementById('watch-lug-top-left'),
+                document.getElementById('watch-lug-top-right'),
+                document.getElementById('watch-lug-bot-left'),
+                document.getElementById('watch-lug-bot-right'),
+                document.getElementById('watch-crown')
+            ];
+            
+            // Ribbon
+            const ribbonSegments = 60;
+            const ribbonEls = [];
+            for (let i = 0; i < ribbonSegments; i++) {
+                const seg = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                seg.setAttribute('r', 3);
+                seg.setAttribute('fill', '#ffffff');
+                layers.ribbon.appendChild(seg);
+                ribbonEls.push(seg);
+            }
+            
+            function project3D(x, y, z, rotX, rotY) {
+                let nx = x, ny = y, nz = z;
+                
+                // Rotate around Y
+                let cosY = Math.cos(rotY), sinY = Math.sin(rotY);
+                let tx = nx * cosY - nz * sinY;
+                let tz = nx * sinY + nz * cosY;
+                nx = tx; nz = tz;
+                
+                // Rotate around X
+                let cosX = Math.cos(rotX), sinX = Math.sin(rotX);
+                let ty = ny * cosX - nz * sinX;
+                tz = ny * sinX + nz * cosX;
+                ny = ty; nz = tz;
+                
+                const scale = 400 / (400 + nz);
+                return { x: nx * scale, y: ny * scale, z: nz, scale: scale };
+            }
+            
+            function animate(timestamp) {
+                if (!startTime) startTime = timestamp;
+                const t = (timestamp - startTime) / 1000;
+                
+                // ORIGIN 0-1
+                if (t < 1) {
+                    showLayer('origin');
+                    const pt = t;
+                    elements.originDot.setAttribute('r', 4 + Math.sin(pt * Math.PI) * 2);
+                    if (pt < 0.08) {
+                        elements.pulse1.setAttribute('r', 4);
+                        elements.pulse1.setAttribute('stroke-opacity', 0);
+                    } else if (pt < 0.35) {
+                        const pr = (pt - 0.08) / 0.27;
+                        elements.pulse1.setAttribute('r', 4 + pr * 40);
+                        elements.pulse1.setAttribute('stroke-opacity', 1 - pr);
+                    } else {
+                        elements.pulse1.setAttribute('stroke-opacity', 0);
+                    }
+                    if (pt < 0.2) {
+                        elements.pulse2.setAttribute('r', 4);
+                        elements.pulse2.setAttribute('stroke-opacity', 0);
+                    } else if (pt < 0.55) {
+                        const pr = (pt - 0.2) / 0.35;
+                        elements.pulse2.setAttribute('r', 4 + pr * 60);
+                        elements.pulse2.setAttribute('stroke-opacity', 1 - pr);
+                    } else {
+                        elements.pulse2.setAttribute('stroke-opacity', 0);
+                    }
+                    if (pt < 0.35) {
+                        elements.pulse3.setAttribute('r', 4);
+                        elements.pulse3.setAttribute('stroke-opacity', 0);
+                    } else if (pt < 0.8) {
+                        const pr = (pt - 0.35) / 0.45;
+                        elements.pulse3.setAttribute('r', 4 + pr * 80);
+                        elements.pulse3.setAttribute('stroke-opacity', 1 - pr);
+                    } else {
+                        elements.pulse3.setAttribute('stroke-opacity', 0);
+                    }
+                }
+                // LINE 1-2
+                else if (t < 2) {
+                    showLayer('line');
+                    const pt = (t - 1);
+                    const eased = easeOutElastic(pt);
+                    const width = eased * 380;
+                    elements.centerLine.setAttribute('x1', -width);
+                    elements.centerLine.setAttribute('x2', width);
+                    elements.centerLine.setAttribute('y1', 0);
+                    elements.centerLine.setAttribute('y2', 0);
+                    elements.centerLine.setAttribute('stroke-width', 1.5 - eased * 0.5);
+                }
+                // GRID 2-4
+                else if (t < 4) {
+                    const pt = (t - 2) / 2;
+                    if (pt < 0.25) {
+                        showLayer('line');
+                        const s = pt / 0.25;
+                        elements.centerLine.setAttribute('stroke-opacity', 1 - s);
+                    } else {
+                        showLayer('grid');
+                        const gridPt = (pt - 0.25) / 0.75;
+                        gridLines.forEach((gl, i) => {
+                            let showT = Math.min(1, Math.max(0, gridPt * 1.5 - Math.abs(gl.idx) * 0.08));
+                            gl.el.setAttribute('stroke-opacity', showT * 0.9);
+                        });
+                        
+                        if (gridPt > 0.5) {
+                            const morphT = (gridPt - 0.5) / 0.5;
+                            const eased = easeInOutCubic(morphT);
+                            const rotation = eased * 45;
+                            
+                            gridLines.forEach((gl) => {
+                                if (gl.type === 'h') {
+                                    const bend = eased * gl.idx * gl.idx * 2.5;
+                                    const y = gl.idx * 30;
+                                    const r = 160 + bend;
+                                    const path = `M ${-r} ${y} A ${r} ${Math.abs(r)} 0 0 1 ${r} ${y} A ${r} ${Math.abs(r)} 0 0 1 ${-r} ${y}`;
+                                    gl.el.setAttribute('d', path);
+                                    gl.el.setAttribute('transform', `rotate(${rotation})`);
+                                } else {
+                                    const bend = eased * gl.idx * gl.idx * 2;
+                                    const x = gl.idx * 40;
+                                    const r = 130 + bend;
+                                    const path = `M ${x} ${-r} A ${Math.abs(r)} ${r} 0 0 1 ${x} ${r} A ${Math.abs(r)} ${r} 0 0 1 ${x} ${-r}`;
+                                    gl.el.setAttribute('d', path);
+                                    gl.el.setAttribute('transform', `rotate(${rotation})`);
+                                }
+                            });
+                        }
+                    }
+                }
+                // CIRCLE 4-6
+                else if (t < 6) {
+                    showLayer('circle');
+                    const pt = (t - 4) / 2;
+                    
+                    gridLines.forEach(gl => {
+                        gl.el.setAttribute('stroke-opacity', Math.max(0, 1 - pt * 3));
+                    });
+                    
+                    const circleR = easeOutElastic(Math.min(1, pt * 1.5)) * 130;
+                    elements.finalCircle.setAttribute('r', circleR);
+                    elements.finalCircle.setAttribute('stroke-width', 1.5 + (1 - pt) * 0.5);
+                }
+                // WIREFRAME SPHERE 4-6 (overlaps)
+                else if (t < 6) {
+                    // handled above
+                }
+                // WIREFRAME + SOLID SPHERE 4-6
+                else if (t >= 4 && t < 6) {
+                    const pt = (t - 4) / 2;
+                    
+                    if (pt > 0.15) {
+                        showLayer('wireframeSphere');
+                        const sphereT = (pt - 0.15) / 0.85;
+                        const rotY = sphereT * Math.PI * 0.5;
+                        
+                        sphereLines.forEach(sl => {
+                            if (sl.type === 'lat') {
+                                const r = sl.r * (0.3 + sphereT * 0.7);
+                                const y = sl.y * (0.3 + sphereT * 0.7);
+                                sl.el.setAttribute('cy', y);
+                                sl.el.setAttribute('rx', r);
+                                sl.el.setAttribute('ry', r * 0.35);
+                                sl.el.setAttribute('stroke-opacity', sphereT);
+                            } else {
+                                sl.el.setAttribute('stroke-opacity', sphereT);
+                                sl.el.setAttribute('transform', `rotate(${sl.angle * 180 / Math.PI + rotY * 180 / Math.PI})`);
+                            }
+                        });
+                    }
+                    
+                    if (pt > 0.7) {
+                        const solidT = (pt - 0.7) / 0.3;
+                        const eased = easeInOutCubic(solidT);
+                        showLayer('solidSphere');
+                        layers.wireframeSphere.classList.add('active');
+                        elements.solidSphere.setAttribute('r', eased * 128);
+                        sphereLines.forEach(sl => sl.el.setAttribute('stroke-opacity', 1 - eased));
+                    }
+                }
+                // INTERFACE 6-8
+                else if (t < 8) {
+                    const pt = (t - 6) / 2;
+                    showLayer('solidSphere');
+                    
+                    if (pt > 0.1) {
+                        const morphT = (pt - 0.1) / 0.9;
+                        const eased = easeInOutCubic(morphT);
+                        
+                        elements.solidSphere.setAttribute('r', 128 * (1 - eased));
+                        
+                        const phoneOpacity = Math.max(0, (morphT - 0.5) / 0.5);
+                        if (phoneOpacity > 0) {
+                            showLayer('interface');
+                            layers.solidSphere.classList.add('active');
+                            document.getElementById('phone-frame').setAttribute('stroke-opacity', phoneOpacity);
+                            
+                            const uiT = Math.max(0, (morphT - 0.7) / 0.3);
+                            if (uiT > 0) {
+                                const uiEased = easeOutCubic(uiT);
+                                document.getElementById('status-bar').setAttribute('stroke-opacity', uiEased);
+                                for (let i = 1; i <= 12; i++) {
+                                    const icon = document.getElementById('app-icon-' + i);
+                                    if (icon) icon.setAttribute('stroke-opacity', uiEased);
+                                }
+                                document.getElementById('home-bar').setAttribute('fill-opacity', uiEased);
+                            }
+                        }
+                    }
+                }
+                // CUBE 8-10
+                else if (t < 10) {
+                    const pt = (t - 8) / 2;
+                    
+                    if (pt < 0.15) {
+                        showLayer('interface');
+                        const fade = 1 - pt / 0.15;
+                        document.getElementById('phone-frame').setAttribute('stroke-opacity', fade);
+                        document.getElementById('status-bar').setAttribute('stroke-opacity', fade);
+                        for (let i = 1; i <= 12; i++) {
+                            const icon = document.getElementById('app-icon-' + i);
+                            if (icon) icon.setAttribute('stroke-opacity', fade);
+                        }
+                        document.getElementById('home-bar').setAttribute('fill-opacity', fade);
+                    } else {
+                        showLayer('cube');
+                        const cubeT = (pt - 0.15) / 0.85;
+                        const rotX = -0.3 + Math.sin(cubeT * Math.PI) * 0.4;
+                        const rotY = cubeT * Math.PI * 0.5;
+                        const scale = easeOutElastic(Math.min(1, cubeT * 2)) * 1;
+                        
+                        cubeLines.forEach(line => {
+                            const v1 = cubeVertices[line.v1];
+                            const v2 = cubeVertices[line.v2];
+                            const p1 = project3D(v1[0]*cubeSize*scale, v1[1]*cubeSize*scale, v1[2]*cubeSize*scale, rotX, rotY);
+                            const p2 = project3D(v2[0]*cubeSize*scale, v2[1]*cubeSize*scale, v2[2]*cubeSize*scale, rotX, rotY);
+                            line.el.setAttribute('x1', p1.x);
+                            line.el.setAttribute('y1', p1.y);
+                            line.el.setAttribute('x2', p2.x);
+                            line.el.setAttribute('y2', p2.y);
+                            line.el.setAttribute('stroke-opacity', Math.min(1, cubeT * 2));
+                        });
+                        
+                        cubeFaces.forEach(face => {
+                            const points = face.verts.map(vi => {
+                                const v = cubeVertices[vi];
+                                const p = project3D(v[0]*cubeSize*scale, v[1]*cubeSize*scale, v[2]*cubeSize*scale, rotX, rotY);
+                                return `${p.x},${p.y}`;
+                            }).join(' ');
+                            face.el.setAttribute('points', points);
+                            face.el.setAttribute('stroke-opacity', Math.min(0.3, cubeT));
+                            face.el.setAttribute('fill-opacity', Math.min(0.1, cubeT * 0.1));
+                        });
+                        
+                        // Flower bloom at end
+                        if (cubeT > 0.7) {
+                            const bloomT = (cubeT - 0.7) / 0.3;
+                            const bloomEased = easeOutCubic(bloomT);
+                            showLayer('flower');
+                            layers.cube.classList.add('active');
+                            
+                            petals.forEach((petal, i) => {
+                                const angle = (i / 6) * Math.PI * 2 + rotY * 0.5;
+                                const dist = bloomEased * 80;
+                                const px = Math.cos(angle) * dist;
+                                const py = Math.sin(angle) * dist * 0.5;
+                                petal.el.setAttribute('cx', px);
+                                petal.el.setAttribute('cy', py);
+                                petal.el.setAttribute('rx', 50 * bloomEased);
+                                petal.el.setAttribute('ry', 25 * bloomEased);
+                                petal.el.setAttribute('transform', `rotate(${angle * 180 / Math.PI + 90}, ${px}, ${py})`);
+                                petal.el.setAttribute('stroke-opacity', bloomEased);
+                                petal.el.setAttribute('fill-opacity', bloomEased * 0.05);
+                            });
+                            
+                            cubeLines.forEach(line => line.el.setAttribute('stroke-opacity', 1 - bloomEased));
+                            cubeFaces.forEach(face => face.el.setAttribute('stroke-opacity', 0.3 * (1 - bloomEased)));
+                        }
+                    }
+                }
+                // PARTICLES 10-12
+                else if (t < 12) {
+                    const pt = (t - 10) / 2;
+                    showLayer('particles');
+                    
+                    petals.forEach(petal => {
+                        petal.el.setAttribute('stroke-opacity', Math.max(0, 1 - pt * 2));
+                        petal.el.setAttribute('fill-opacity', Math.max(0, 0.05 - pt * 0.1));
+                    });
+                    
+                    particles.forEach(p => {
+                        const spawnT = Math.min(1, pt * 3);
+                        if (spawnT < 1) {
+                            p.el.setAttribute('opacity', spawnT);
+                        }
+                        p.angle += p.speed * 0.02;
+                        const wobble = Math.sin(t * p.blinkSpeed + p.phase) * 0.3;
+                        const x = Math.cos(p.angle) * p.radius;
+                        const y = Math.sin(p.angle) * p.radius * 0.4 + wobble * 20;
+                        const z = Math.sin(p.angle * 2) * 30;
+                        const scale = 400 / (400 + z);
+                        p.el.setAttribute('cx', x * scale);
+                        p.el.setAttribute('cy', y * scale);
+                        p.el.setAttribute('r', (Math.random() * 1.5 + 0.5) * scale);
+                        const blink = 0.5 + 0.5 * Math.sin(t * p.blinkSpeed * 2 + p.phase);
+                        p.el.setAttribute('opacity', Math.min(1, pt * 3) * blink);
+                    });
+                }
+                // WATCH 12-13
+                else if (t < 13) {
+                    const pt = (t - 12);
+                    showLayer('watch');
+                    
+                    particles.forEach(p => {
+                        p.el.setAttribute('opacity', Math.max(0, 1 - pt * 3));
+                    });
+                    
+                    const assembleT = easeOutElastic(Math.min(1, pt * 2));
+                    watchParts.forEach((part, i) => {
+                        part.setAttribute('stroke-opacity', assembleT);
+                        if (part.id !== 'watch-case') {
+                            part.setAttribute('stroke-dasharray', '200');
+                            part.setAttribute('stroke-dashoffset', 200 * (1 - assembleT));
+                        }
+                    });
+                }
+                // COLLAPSE 13-14
+                else if (t < 14) {
+                    const pt = (t - 13);
+                    showLayer('ribbon');
+                    
+                    watchParts.forEach(part => {
+                        part.setAttribute('stroke-opacity', Math.max(0, 1 - pt * 3));
+                    });
+                    
+                    const ribbonT = easeInOutCubic(Math.min(1, pt * 1.5));
+                    
+                    // Create flowing ribbon effect
+                    ribbonEls.forEach((seg, i) => {
+                        const angle = i / ribbonSegments * Math.PI * 4 + t * 3;
+                        const radius = 120 * (1 - ribbonT) + 10 * Math.sin(angle * 2);
+                        const x = Math.cos(angle) * radius;
+                        const y = Math.sin(angle) * radius * 0.5 + Math.sin(t * 2 + i * 0.2) * 20 * (1 - ribbonT);
+                        
+                        seg.setAttribute('cx', x);
+                        seg.setAttribute('cy', y);
+                        
+                        if (pt < 0.7) {
+                            seg.setAttribute('r', 3 * (1 - pt / 0.7 * 0.5));
+                            seg.setAttribute('opacity', 1);
+                        } else {
+                            const collapseT = (pt - 0.7) / 0.3;
+                            const eased = easeInOutCubic(collapseT);
+                            seg.setAttribute('cx', x * (1 - eased));
+                            seg.setAttribute('cy', y * (1 - eased));
+                            seg.setAttribute('r', 3 * (1 - eased) + 8 * eased);
+                            seg.setAttribute('opacity', 1 - eased * 0.5);
+                        }
+                    });
+                }
+                // LOGO 14-15
+                else if (t < 15) {
+                    const pt = (t - 14);
+                    showLayer('logo');
+                    layers.glow.classList.add('active');
+                    
+                    ribbonEls.forEach(seg => {
+                        seg.setAttribute('opacity', Math.max(0, 1 - pt * 4));
+                    });
+                    
+                    const logoT = easeOutCubic(Math.min(1, pt * 2));
+                    elements.logoText.setAttribute('opacity', logoT);
+                    
+                    // Amber glow pulse at the very end
+                    if (pt > 0.5) {
+                        const glowT = (pt - 0.5) / 0.5;
+                        const pulse = Math.sin(glowT * Math.PI);
+                        elements.amberPulse.setAttribute('r', pulse * 200);
+                        elements.amberPulse.setAttribute('opacity', pulse * 0.8);
+                    } else {
+                        elements.amberPulse.setAttribute('r', 0);
+                    }
+                }
+                // HOLD
+                else {
+                    showLayer('logo');
+                    layers.glow.classList.add('active');
+                    elements.logoText.setAttribute('opacity', 1);
+                    elements.amberPulse.setAttribute('r', 0);
+                    elements.amberPulse.setAttribute('opacity', 0);
+                }
+                
+                animationId = requestAnimationFrame(animate);
+            }
+            
+            // Convert grid lines to paths for morphing
+            setTimeout(() => {
+                gridLines.forEach(gl => {
+                    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                    if (gl.type === 'h') {
+                        path.setAttribute('d', `M ${-360} ${gl.idx * 30} L ${360} ${gl.idx * 30}`);
+                    } else {
+                        path.setAttribute('d', `M ${gl.idx * 40} ${-270} L ${gl.idx * 40} ${270}`);
+                    }
+                    path.setAttribute('stroke', '#ffffff');
+                    path.setAttribute('stroke-width', '0.6');
+                    path.setAttribute('fill', 'none');
+                    layers.grid.replaceChild(path, gl.el);
+                    gl.el = path;
+                });
+            }, 100);
+            
+            setTimeout(() => {
+                startTime = performance.now();
+                animationId = requestAnimationFrame(animate);
+            }, 200);
+        })();
+    </script>
+</body>
+</html>

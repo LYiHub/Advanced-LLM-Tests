@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AETHERIA | 认知流体</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Space+Grotesk:wght@300;500;700&display=swap" rel="stylesheet">
+    
+    <!-- GSAP for Animations -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+
+    <!-- Three.js for Fluid Background -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <style>
+        :root {
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --glass-bg: rgba(10, 15, 30, 0.45);
+            --glass-highlight: rgba(255, 255, 255, 0.25);
+            --accent-color: #5eead4; /* Cyan/Teal instead of Purple */
+        }
+
+        body {
+            margin: 0;
+            overflow-x: hidden;
+            background-color: #020408; /* Deep dark blue-black */
+            font-family: 'Outfit', sans-serif;
+            color: #e2e8f0;
+        }
+
+        h1, h2, h3 {
+            font-family: 'Space Grotesk', sans-serif;
+            letter-spacing: -0.02em;
+        }
+
+        /* Canvas Background */
+        #fluid-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            opacity: 0.8;
+        }
+
+        /* Core Liquid Glass Effect */
+        .liquid-glass {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px) saturate(140%);
+            -webkit-backdrop-filter: blur(20px) saturate(140%);
+            border: 1px solid var(--glass-border);
+            box-shadow: 
+                0 8px 32px 0 rgba(0, 0, 0, 0.3),
+                inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.1s ease-out, box-shadow 0.3s ease;
+        }
+
+        /* Optical Refraction Highlight */
+        .liquid-glass::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -50%;
+            width: 200%;
+            height: 100%;
+            background: linear-gradient(
+                115deg, 
+                transparent 20%, 
+                rgba(255, 255, 255, 0.03) 45%, 
+                rgba(255, 255, 255, 0.15) 50%, 
+                rgba(255, 255, 255, 0.03) 55%, 
+                transparent 80%
+            );
+            transform: skewX(-20deg) translateX(-100%);
+            transition: transform 0.6s ease;
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        .liquid-glass:hover::before {
+            transform: skewX(-20deg) translateX(100%);
+            transition: transform 0.8s ease-in-out;
+        }
+
+        /* Edge Refraction Illusion */
+        .liquid-glass::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            padding: 1px;
+            background: linear-gradient(180deg, rgba(255,255,255,0.3), rgba(255,255,255,0.0) 40%, rgba(255,255,255,0.0) 60%, rgba(255,255,255,0.1));
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            pointer-events: none;
+            z-index: 3;
+            opacity: 0.6;
+        }
+
+        /* Typography Utilities */
+        .text-glow {
+            text-shadow: 0 0 20px rgba(94, 234, 212, 0.3);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #020408;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.4);
+        }
+
+        /* Layout Z-Index */
+        .content-layer {
+            position: relative;
+            z-index: 10;
+        }
+
+        /* Navigation Hover Effect */
+        .nav-link {
+            position: relative;
+        }
+        .nav-link::after {
+            content: '';
+            position: absolute;
+            bottom: -4px;
+            left: 0;
+            width: 0%;
+            height: 1px;
+            background-color: var(--accent-color);
+            transition: width 0.3s ease;
+        }
+        .nav-link:hover::after {
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Three.js Fluid Background -->
+    <canvas id="fluid-canvas"></canvas>
+
+    <!-- Main Content -->
+    <div class="content-layer w-full">
+
+        <!-- Navigation -->
+        <nav class="fixed top-0 w-full z-50 px-6 py-4 transition-all duration-300" id="navbar">
+            <div class="max-w-7xl mx-auto flex justify-between items-center liquid-glass rounded-2xl px-6 py-3">
+                <div class="flex items-center gap-2">
+                    <div class="w-3 h-3 rounded-full bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.8)]"></div>
+                    <span class="text-xl font-bold tracking-widest text-white">AETHERIA</span>
+                </div>
+                <div class="hidden md:flex gap-8 text-sm font-medium text-gray-300">
+                    <a href="#vision" class="nav-link hover:text-white transition-colors">愿景</a>
+                    <a href="#products" class="nav-link hover:text-white transition-colors">核心架构</a>
+                    <a href="#research" class="nav-link hover:text-white transition-colors">研究</a>
+                    <a href="#contact" class="nav-link hover:text-white transition-colors">联系我们</a>
+                </div>
+                <button class="px-5 py-2 rounded-lg bg-white/10 hover:bg-white/20 border border-white/10 text-white text-sm font-semibold transition-all hover:shadow-[0_0_15px_rgba(255,255,255,0.2)]">
+                    开发者入口
+                </button>
+            </div>
+        </nav>
+
+        <!-- Hero Section -->
+        <header class="min-h-screen flex items-center justify-center px-6 pt-20 relative">
+            <div class="max-w-5xl mx-auto text-center relative z-10">
+                <div class="mb-6 inline-block px-4 py-1 rounded-full liquid-glass border-cyan-500/30 text-cyan-300 text-xs font-bold tracking-wider uppercase backdrop-blur-md">
+                    Next Generation Foundation Model v3.0
+                </div>
+                <h1 class="text-5xl md:text-8xl font-bold mb-8 leading-tight text-transparent bg-clip-text bg-gradient-to-b from-white via-gray-200 to-gray-600 drop-shadow-2xl">
+                    重塑<br>
+                    <span class="text-white text-glow">认知的边界</span>
+                </h1>
+                <p class="text-lg md:text-2xl text-gray-400 max-w-2xl mx-auto mb-12 font-light leading-relaxed">
+                    Aetheria 致力于构建具备物理直觉与因果推理能力的通用人工智能。我们不生成幻觉，我们模拟现实。
+                </p>
+                <div class="flex flex-col md:flex-row gap-4 justify-center items-center">
+                    <button class="liquid-glass px-8 py-4 rounded-xl text-white font-bold text-lg hover:scale-105 transition-transform duration-300 group">
+                        <span class="group-hover:text-cyan-300 transition-colors">探索核心模型</span>
+                        <i class="ml-2 opacity-0 group-hover:opacity-100 transition-opacity">→</i>
+                    </button>
+                    <button class="px-8 py-4 rounded-xl text-gray-400 font-medium text-lg hover:text-white transition-colors">
+                        查看演示文档
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Scroll Indicator -->
+            <div class="absolute bottom-10 left-1/2 transform -translate-x-1/2 flex flex-col items-center gap-2 opacity-50 animate-pulse">
+                <span class="text-xs tracking-widest uppercase">Scroll</span>
+                <div class="w-px h-12 bg-gradient-to-b from-white to-transparent"></div>
+            </div>
+        </header>
+
+        <!-- Stats / Vision Strip -->
+        <section id="vision" class="py-20 px-6 relative">
+            <div class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
+                <!-- Card 1 -->
+                <div class="liquid-glass p-8 rounded-3xl transform hover:-translate-y-2 transition-transform duration-500 cursor-pointer group tilt-card">
+                    <div class="text-cyan-400 mb-4 text-4xl font-light">01</div>
+                    <h3 class="text-2xl font-bold mb-3 text-white group-hover:text-cyan-200 transition-colors">物理引擎驱动</h3>
+                    <p class="text-gray-400 text-sm leading-relaxed">
+                        突破传统 Transformer 的局限，引入物理先验知识，让 AI 理解物体、重力与因果关系，而非简单的概率模式匹配。
+                    </p>
+                </div>
+                <!-- Card 2 -->
+                <div class="liquid-glass p-8 rounded-3xl transform hover:-translate-y-2 transition-transform duration-500 cursor-pointer group tilt-card">
+                    <div class="text-cyan-400 mb-4 text-4xl font-light">02</div>
+                    <h3 class="text-2xl font-bold mb-3 text-white group-hover:text-cyan-200 transition-colors">液态记忆网络</h3>
+                    <p class="text-gray-400 text-sm leading-relaxed">
+                        采用动态稀疏激活机制，模拟人脑神经元的突触可塑性。处理万亿级参数仅需极低的能耗，实现真正的边缘计算。
+                    </p>
+                </div>
+                <!-- Card 3 -->
+                <div class="liquid-glass p-8 rounded-3xl transform hover:-translate-y-2 transition-transform duration-500 cursor-pointer group tilt-card">
+                    <div class="text-cyan-400 mb-4 text-4xl font-light">03</div>
+                    <h3 class="text-2xl font-bold mb-3 text-white group-hover:text-cyan-200 transition-colors">认知安全沙盒</h3>
+                    <p class="text-gray-400 text-sm leading-relaxed">
+                        内置多维度价值对齐系统，实时监测并修正推理偏差，确保每一次输出的绝对可靠与符合伦理规范。
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Interactive Showcase Section -->
+        <section id="products" class="py-24 px-6">
+            <div class="max-w-6xl mx-auto">
+                <div class="flex flex-col md:flex-row justify-between items-end mb-16">
+                    <div>
+                        <h2 class="text-4xl md:text-5xl font-bold mb-4">多模态融合架构</h2>
+                        <p class="text-gray-400 max-w-lg">打破模态壁垒，实现文本、视觉与时空数据的无缝流转。</p>
+                    </div>
+                    <div class="hidden md:block">
+                        <div class="flex gap-2">
+                            <div class="w-2 h-2 rounded-full bg-cyan-400"></div>
+                            <div class="w-2 h-2 rounded-full bg-gray-600"></div>
+                            <div class="w-2 h-2 rounded-full bg-gray-600"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Large Feature Card -->
+                <div class="liquid-glass rounded-[2rem] p-1 md:p-2 relative overflow-hidden group">
+                    <div class="absolute top-0 right-0 w-96 h-96 bg-cyan-500/20 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
+                    
+                    <div class="grid md:grid-cols-2 gap-8 bg-black/20 rounded-[1.8rem] p-8 md:p-12 relative z-10">
+                        <div class="flex flex-col justify-center">
+                            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-900/30 border border-cyan-500/30 text-cyan-300 text-xs w-fit mb-6">
+                                <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
+                                实时推理演示
+                            </div>
+                            <h3 class="text-3xl font-bold mb-6">Nexus 视觉-语言模型</h3>
+                            <p class="text-gray-300 mb-8 leading-relaxed">
+                                Nexus 不仅能"看到"图像，更能理解图像背后的三维空间结构与物理交互。上传一张图片，询问物体的材质、重量或潜在的运动轨迹。
+                            </p>
+                            <ul class="space-y-4 mb-8">
+                                <li class="flex items-center gap-3 text-gray-400">
+                                    <svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                                    128K 上下文窗口
+                                </li>
+                                <li class="flex items-center gap-3 text-gray-400">
+                                    <svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                                    4D 时空理解能力
+                                </li>
+                                <li class="flex items-center gap-3 text-gray-400">
+                                    <svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                                    零样本泛化
+                                </li>
+                            </ul>
+                            <button class="text-white border-b border-cyan-500 pb-1 hover:text-cyan-300 transition-colors w-fit">
+                                阅读技术白皮书 →
+                            </button>
+                        </div>
+                        
+                        <!-- Visual Representation -->
+                        <div class="relative h-[400px] rounded-2xl overflow-hidden border border-white/5 bg-gradient-to-br from-gray-900 to-black flex items-center justify-center">
+                            <!-- Abstract Tech Visualization -->
+                            <div class="absolute inset-0 grid grid-cols-6 grid-rows-6 gap-1 opacity-20">
+                                <div class="bg-cyan-500/20 rounded-sm col-span-2 row-span-2"></div>
+                                <div class="bg-white/10 rounded-sm col-span-1 row-span-3"></div>
+                                <div class="bg-cyan-500/10 rounded-sm col-span-3 row-span-1"></div>
+                                <div class="bg-white/5 rounded-sm col-span-2 row-span-4"></div>
+                                <div class="bg-cyan-500/30 rounded-sm col-span-2 row-span-1"></div>
+                            </div>
+                            <div class="relative z-10 text-center p-6 liquid-glass rounded-xl border-cyan-500/20 shadow-[0_0_30px_rgba(34,211,238,0.1)]">
+                                <div class="text-5xl font-mono text-cyan-400 mb-2">98.4%</div>
+                                <div class="text-xs text-gray-400 uppercase tracking-widest">物理逻辑准确率</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- CTA Section -->
+        <section id="contact" class="py-32 px-6 relative overflow-hidden">
+            <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-cyan-900/20 rounded-full blur-[120px] pointer-events-none"></div>
+            
+            <div class="max-w-4xl mx-auto text-center relative z-10">
+                <h2 class="text-5xl md:text-7xl font-bold mb-8 text-white">开启智能纪元</h2>
+                <p class="text-xl text-gray-300 mb-12 max-w-2xl mx-auto">
+                    加入全球 500+ 顶尖企业的行列，使用 Aetheria 重构您的业务逻辑与数据价值。
+                </p>
+                <form class="max-w-md mx-auto flex flex-col gap-4" onsubmit="event.preventDefault();">
+                    <div class="liquid-glass rounded-xl p-1 flex items-center">
+                        <input type="email" placeholder="输入您的企业邮箱" class="bg-transparent border-none outline-none text-white px-4 py-3 w-full placeholder-gray-500">
+                        <button class="bg-white text-black font-bold px-6 py-3 rounded-lg hover:bg-cyan-50 transition-colors">
+                            申请内测
+                        </button>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-2">我们承诺保护您的隐私数据，符合 GDPR 与 SOC2 标准。</p>
+                </form>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="border-t border-white/5 bg-black/40 backdrop-blur-xl py-12 px-6">
+            <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-8">
+                <div class="flex items-center gap-2">
+                    <div class="w-2 h-2 rounded-full bg-cyan-400"></div>
+                    <span class="text-lg font-bold text-white tracking-widest">AETHERIA</span>
+                </div>
+                <div class="text-gray-500 text-sm">
+                     Aetheria Intelligence Inc. All rights reserved.
+                </div>
+                <div class="flex gap-6 text-gray-400">
+                    <a href="#" class="hover:text-white transition-colors">Twitter</a>
+                    <a href="#" class="hover:text-white transition-colors">LinkedIn</a>
+                    <a href="#" class="hover:text-white transition-colors">GitHub</a>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        // --- Three.js Fluid Background Implementation ---
+        // Simplex Noise for organic movement
+        const noise = `
+            vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+            vec4 mod289(vec4 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+            vec4 permute(vec4 x) { return mod289(((x*34.0)+1.0)*x); }
+            vec4 taylorInvSqrt(vec4 r) { return 1.79284291400159 - 0.85373472095314 * r; }
+            vec3 fade(vec3 t) { return t*t*t*(t*(t*6.0-15.0)+10.0); }
+            float cnoise(vec3 P) {
+                vec3 Pi0 = floor(P); vec3 Pi1 = Pi0 + vec3(1.0);
+                Pi0 = mod289(Pi0); Pi1 = mod289(Pi1);
+                vec3 Pf0 = fract(P); vec3 Pf1 = Pf0 - vec3(1.0);
+                vec4 ix = vec4(Pi0.x, Pi1.x, Pi0.x, Pi1.x);
+                vec4 iy = vec4(Pi0.yy, Pi1.yy);
+                vec4 iz0 = Pi0.zzzz; vec4 iz1 = Pi1.zzzz;
+                vec4 ixy = permute(permute(ix) + iy);
+                vec4 ixy0 = permute(ixy + iz0); vec4 ixy1 = permute(ixy + iz1);
+                vec4 gx0 = ixy0 * (1.0 / 7.0); vec4 gy0 = fract(floor(gx0) * (1.0 / 7.0)) - 0.5;
+                gx0 = fract(gx0); vec4 gz0 = vec4(0.5) - abs(gx0) - abs(gy0);
+                vec4 sz0 = step(gz0, vec4(0.0)); gx0 -= sz0 * (step(0.0, gx0) - 0.5);
+                gy0 -= sz0 * (step(0.0, gy0) - 0.5);
+                vec4 gx1 = ixy1 * (1.0 / 7.0); vec4 gy1 = fract(floor(gx1) * (1.0 / 7.0)) - 0.5;
+                gx1 = fract(gx1); vec4 gz1 = vec4(0.5) - abs(gx1) - abs(gy1);
+                vec4 sz1 = step(gz1, vec4(0.0)); gx1 -= sz1 * (step(0.0, gx1) - 0.5);
+                gy1 -= sz1 * (step(0.0, gy1) - 0.5);
+                vec3 g000 = vec3(gx0.x,gy0.x,gz0.x); vec3 g100 = vec3(gx0.y,gy0.y,gz0.y);
+                vec3 g010 = vec3(gx0.z,gy0.z,gz0.z); vec3 g110 = vec3(gx0.w,gy0.w,gz0.w);
+                vec3 g001 = vec3(gx1.x,gy1.x,gz1.x); vec3 g101 = vec3(gx1.y,gy1.y,gz1.y);
+                vec3 g011 = vec3(gx1.z,gy1.z,gz1.z); vec3 g111 = vec3(gx1.w,gy1.w,gz1.w);
+                vec4 norm0 = taylorInvSqrt(vec4(dot(g000,g000), dot(g010,g010), dot(g100,g100), dot(g110,g110)));
+                g000 *= norm0.x; g010 *= norm0.y; g100 *= norm0.z; g110 *= norm0.w;
+                vec4 norm1 = taylorInvSqrt(vec4(dot(g001,g001), dot(g011,g011), dot(g101,g101), dot(g111,g111)));
+                g001 *= norm1.x; g011 *= norm1.y; g101 *= norm1.z; g111 *= norm1.w;
+                float n000 = dot(g000, Pf0);
+                float n100 = dot(g100, vec3(Pf1.x, Pf0.yz));
+                float n010 = dot(g010, vec3(Pf0.x, Pf1.y, Pf0.z));
+                float n110 = dot(g110, vec3(Pf1.xy, Pf0.z));
+                float n001 = dot(g001, vec3(Pf0.xy, Pf1.z));
+                float n101 = dot(g101, vec3(Pf1.x, Pf0.y, Pf1.z));
+                float n011 = dot(g011, vec3(Pf0.x, Pf1.yz));
+                float n111 = dot(g111, Pf1);
+                vec3 fade_xyz = fade(Pf0);
+                vec4 n_z = mix(vec4(n000, n100, n010, n110), vec4(n001, n101, n011, n111), fade_xyz.z);
+                vec2 n_yz = mix(n_z.xy, n_z.zw, fade_xyz.y);
+                float n_xyz = mix(n_yz.x, n_yz.y, fade_xyz.x); 
+                return 2.2 * n_xyz;
+            }
+        `;
+
+        const vertexShader = `
+            varying vec2 vUv;
+            void main() {
+                vUv = uv;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }
+        `;
+
+        const fragmentShader = `
+            uniform float uTime;
+            uniform vec2 uMouse;
+            uniform vec2 uResolution;
+            varying vec2 vUv;
+            ${noise}
+
+            void main() {
+                vec2 uv = vUv;
+                
+                // Aspect ratio correction
+                uv.x *= uResolution.x / uResolution.y;
+
+                // Mouse influence
+                vec2 mouse = uMouse * 0.5 + 0.5;
+                mouse.x *= uResolution.x / uResolution.y;
+                float dist = distance(uv, mouse);
+                float mouseEffect = smoothstep(0.5, 0.0, dist) * 0.2;
+
+                // Fluid Movement
+                float t = uTime * 0.15;
+                
+                // Layer 1: Slow deep blobs (Deep Blue)
+                float n1 = cnoise(vec3(uv * 1.5, t));
+                float blob1 = smoothstep(0.4, 0.6, n1 + mouseEffect);
+
+                // Layer 2: Faster mid-tone (Teal/Cyan)
+                float n2 = cnoise(vec3(uv * 3.0 + 10.0, t * 1.5));
+                float blob2 = smoothstep(0.45, 0.55, n2);
+
+                // Layer 3: Fine detail (Highlights)
+                float n3 = cnoise(vec3(uv * 6.0 - 5.0, t * 2.0));
+                float blob3 = smoothstep(0.48, 0.52, n3);
+
+                // Color Palette (Dark, Moody, Cyan/Teal accents)
+                vec3 color1 = vec3(0.01, 0.02, 0.05); // Very dark blue
+                vec3 color2 = vec3(0.05, 0.1, 0.2);   // Dark blue
+                vec3 color3 = vec3(0.0, 0.4, 0.5);    // Cyan/Teal
+                vec3 color4 = vec3(0.8, 0.9, 1.0);    // White highlight
+
+                vec3 finalColor = mix(color1, color2, blob1);
+                finalColor = mix(finalColor, color3, blob2 * 0.6);
+                finalColor = mix(finalColor, color4, blob3 * 0.3);
+
+                // Vignette
+                float vignette = 1.0 - smoothstep(0.5, 1.5, length(vUv - 0.5) * 1.5);
+                finalColor *= vignette;
+
+                gl_FragColor = vec4(finalColor, 1.0);
+            }
+        `;
+
+        // Init Three.js
+        const canvas = document.getElementById('fluid-canvas');
+        const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+        const scene = new THREE.Scene();
+        const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+
+        const geometry = new THREE.PlaneGeometry(2, 2);
+        const uniforms = {
+            uTime: { value: 0 },
+            uMouse: { value: new THREE.Vector2(0, 0) },
+            uResolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) }
+        };
+
+        const material = new THREE.ShaderMaterial({
+            vertexShader,
+            fragmentShader,
+            uniforms
+        });
+
+        const mesh = new THREE.Mesh(geometry, material);
+        scene.add(mesh);
+
+        // Mouse Tracking
+        let mouseX = 0;
+        let mouseY = 0;
+        let targetMouseX = 0;
+        let targetMouseY = 0;
+
+        window.addEventListener('mousemove', (e) => {
+            targetMouseX = (e.clientX / window.innerWidth) * 2 - 1;
+            targetMouseY = -(e.clientY / window.innerHeight) * 2 + 1;
+        });
+
+        window.addEventListener('resize', () => {
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            uniforms.uResolution.value.set(window.innerWidth, window.innerHeight);
+        });
+
+        // Animation Loop
+        const clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const elapsedTime = clock.getElapsedTime();
+            uniforms.uTime.value = elapsedTime;
+
+            // Smooth mouse interpolation
+            mouseX += (targetMouseX - mouseX) * 0.05;
+            mouseY += (targetMouseY - mouseY) * 0.05;
+            uniforms.uMouse.value.set(mouseX, mouseY);
+
+            renderer.render(scene, camera);
+        }
+        animate();
+
+
+        // --- GSAP Scroll Animations ---
+        gsap.registerPlugin(ScrollTrigger);
+
+        // Fade in elements on scroll
+        gsap.utils.toArray('.liquid-glass').forEach((element, i) => {
+            gsap.from(element, {
+                scrollTrigger: {
+                    trigger: element,
+                    start: "top 85%",
+                    toggleActions: "play none none reverse"
+                },
+                y: 50,
+                opacity: 0,
+                duration: 1,
+                ease: "power3.out",
+                delay: i * 0.1
+            });
+        });
+
+        // --- 3D Tilt Effect for Cards ---
+        const cards = document.querySelectorAll('.tilt-card');
+
+        cards.forEach(card => {
+            card.addEventListener('mousemove', (e) => {
+                const rect = card.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                const centerX = rect.width / 2;
+                const centerY = rect.height / 2;
+                
+                const rotateX = ((y - centerY) / centerY) * -5; // Max rotation deg
+                const rotateY = ((x - centerX) / centerX) * 5;
+
+                card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.02, 1.02, 1.02)`;
+                
+                // Dynamic lighting on the glass
+                const glareX = (x / rect.width) * 100;
+                const glareY = (y / rect.height) * 100;
+                card.style.setProperty('--glare-x', `${glareX}%`);
+                card.style.setProperty('--glare-y', `${glareY}%`);
+            });
+
+            card.addEventListener('mouseleave', () => {
+                card.style.transform = 'perspective(1000px) rotateX(0) rotateY(0) scale3d(1, 1, 1)';
+            });
+        });
+
+        // Navbar Glass Transition on Scroll
+        window.addEventListener('scroll', () => {
+            const nav = document.getElementById('navbar');
+            if (window.scrollY > 50) {
+                nav.classList.add('py-2');
+                nav.classList.remove('py-4');
+            } else {
+                nav.classList.add('py-4');
+                nav.classList.remove('py-2');
+            }
+        });
+
+    </script>
+</body>
+</html>

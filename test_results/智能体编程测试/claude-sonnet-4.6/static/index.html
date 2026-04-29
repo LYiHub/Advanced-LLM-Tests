@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>多角色权限计算器</title>
+  <style>
+    /* ── Reset & base ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px 48px;
+    }
+    h1 { font-size: 1.5rem; color: #7dd3fc; margin-bottom: 4px; }
+    h2 { font-size: 1.1rem; color: #94a3b8; margin-bottom: 16px; }
+    h3 { font-size: .95rem; color: #7dd3fc; margin-bottom: 12px; }
+
+    /* ── Cards ── */
+    .card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 24px;
+      width: 100%;
+      max-width: 480px;
+      margin-bottom: 20px;
+    }
+
+    /* ── Form ── */
+    .form-group { margin-bottom: 14px; }
+    label { display: block; font-size: .85rem; color: #94a3b8; margin-bottom: 4px; }
+    input[type="text"], input[type="password"], input[type="number"], select {
+      width: 100%; padding: 10px 12px; border-radius: 8px;
+      border: 1px solid #475569; background: #0f172a; color: #e2e8f0;
+      font-size: .95rem; outline: none; transition: border-color .2s;
+    }
+    input:focus, select:focus { border-color: #7dd3fc; }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      padding: 9px 18px; border-radius: 8px; border: none; cursor: pointer;
+      font-size: .9rem; font-weight: 500; transition: opacity .15s, transform .1s;
+    }
+    .btn:active { transform: scale(.97); }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
+    .btn-primary  { background: #3b82f6; color: #fff; }
+    .btn-success  { background: #22c55e; color: #fff; }
+    .btn-danger   { background: #ef4444; color: #fff; }
+    .btn-warning  { background: #f59e0b; color: #fff; }
+    .btn-ghost    { background: #334155; color: #e2e8f0; }
+    .btn-sm       { padding: 5px 12px; font-size: .8rem; }
+    .btn-full     { width: 100%; }
+
+    /* ── Alert ── */
+    .alert {
+      padding: 10px 14px; border-radius: 8px; font-size: .875rem;
+      margin-bottom: 14px; display: none;
+    }
+    .alert.show { display: block; }
+    .alert-error   { background: #450a0a; border: 1px solid #ef4444; color: #fca5a5; }
+    .alert-success { background: #052e16; border: 1px solid #22c55e; color: #86efac; }
+    .alert-info    { background: #0c1a2e; border: 1px solid #3b82f6; color: #93c5fd; }
+
+    /* ── Tab switcher (login / register) ── */
+    .tabs { display: flex; gap: 4px; margin-bottom: 20px; }
+    .tab-btn {
+      flex: 1; padding: 9px; border-radius: 8px; border: 1px solid #334155;
+      background: transparent; color: #94a3b8; cursor: pointer; font-size: .9rem;
+      transition: all .2s;
+    }
+    .tab-btn.active {
+      background: #3b82f6; border-color: #3b82f6; color: #fff;
+    }
+
+    /* ── Calculator grid ── */
+    .calc-display {
+      background: #0f172a; border: 1px solid #334155; border-radius: 8px;
+      padding: 14px 16px; font-size: 1.6rem; text-align: right; color: #f1f5f9;
+      min-height: 56px; margin-bottom: 14px; word-break: break-all;
+      line-height: 1.3;
+    }
+    .calc-display .expr { font-size: .85rem; color: #64748b; min-height: 20px; }
+
+    .op-btns { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+    .op-btn {
+      flex: 1 1 80px; padding: 12px; border-radius: 8px; border: 1px solid #475569;
+      background: #1e293b; color: #e2e8f0; cursor: pointer; font-size: 1.2rem;
+      transition: background .15s;
+    }
+    .op-btn:hover { background: #334155; }
+    .op-btn.selected { background: #1d4ed8; border-color: #3b82f6; color: #fff; }
+
+    .num-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .num-btn {
+      padding: 14px; border-radius: 8px; border: 1px solid #334155;
+      background: #1e293b; color: #e2e8f0; cursor: pointer; font-size: 1rem;
+      transition: background .15s;
+    }
+    .num-btn:hover { background: #334155; }
+    .num-btn.zero { grid-column: span 2; }
+    .num-btn.equals {
+      background: #3b82f6; border-color: #3b82f6; color: #fff;
+      grid-column: span 1;
+    }
+    .num-btn.equals:hover { background: #2563eb; }
+    .num-btn.clear { background: #7f1d1d; border-color: #ef4444; color: #fca5a5; }
+    .num-btn.clear:hover { background: #991b1b; }
+    .num-btn.back { background: #451a03; border-color: #f59e0b; color: #fde68a; }
+    .num-btn.back:hover { background: #78350f; }
+
+    /* ── History ── */
+    .history-list { list-style: none; }
+    .history-list li {
+      padding: 8px 10px; border-radius: 6px; background: #0f172a;
+      margin-bottom: 6px; font-size: .85rem; color: #cbd5e1;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .history-list li .time { color: #475569; font-size: .75rem; }
+
+    /* ── Badge ── */
+    .badge {
+      display: inline-block; padding: 2px 8px; border-radius: 99px;
+      font-size: .72rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em;
+    }
+    .badge-guest       { background: #374151; color: #9ca3af; }
+    .badge-member      { background: #1d4ed8; color: #bfdbfe; }
+    .badge-admin       { background: #9333ea; color: #e9d5ff; }
+    .badge-superadmin  { background: #b45309; color: #fde68a; }
+    .badge-banned      { background: #7f1d1d; color: #fca5a5; }
+
+    /* ── User table ── */
+    .user-table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+    .user-table th {
+      text-align: left; padding: 8px 10px; color: #64748b;
+      border-bottom: 1px solid #334155; font-weight: 500;
+    }
+    .user-table td { padding: 8px 10px; border-bottom: 1px solid #1e293b; }
+    .user-table tr:last-child td { border-bottom: none; }
+
+    /* ── Rule tamper ── */
+    .rule-row {
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      padding: 8px 10px; background: #0f172a; border-radius: 6px; margin-bottom: 6px;
+    }
+    .rule-row .expr { flex: 1; font-size: .9rem; color: #fde68a; }
+    .rule-inputs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+    .rule-inputs input, .rule-inputs select { flex: 1; min-width: 80px; }
+
+    /* ── Section separator ── */
+    .section-sep {
+      border: none; border-top: 1px solid #334155; margin: 20px 0;
+    }
+
+    /* ── Navbar ── */
+    .navbar {
+      width: 100%; max-width: 480px;
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 20px; padding: 12px 16px;
+      background: #1e293b; border: 1px solid #334155; border-radius: 12px;
+    }
+    .navbar .user-info { display: flex; align-items: center; gap: 10px; }
+    .navbar .username { font-weight: 600; color: #f1f5f9; }
+
+    /* ── Hidden ── */
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════ AUTH SECTION ════════════════ -->
+<div id="auth-section">
+  <div style="text-align:center; margin-bottom: 24px;">
+    <h1>🔢 多角色权限计算器</h1>
+    <p style="color:#64748b; font-size:.85rem; margin-top:4px;">不同角色，不同权限，甚至不同的数学</p>
+  </div>
+
+  <div class="card">
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('login')">登录</button>
+      <button class="tab-btn" onclick="switchTab('register')">注册</button>
+    </div>
+
+    <div id="alert-auth" class="alert"></div>
+
+    <!-- Login form -->
+    <div id="login-form">
+      <div class="form-group">
+        <label>用户名</label>
+        <input type="text" id="login-username" placeholder="输入用户名" autocomplete="username" />
+      </div>
+      <div class="form-group">
+        <label>密码</label>
+        <input type="password" id="login-password" placeholder="输入密码" autocomplete="current-password" />
+      </div>
+      <button class="btn btn-primary btn-full" onclick="doLogin()">登录</button>
+    </div>
+
+    <!-- Register form -->
+    <div id="register-form" class="hidden">
+      <div class="form-group">
+        <label>用户名</label>
+        <input type="text" id="reg-username" placeholder="设置用户名" autocomplete="username" />
+      </div>
+      <div class="form-group">
+        <label>密码（至少 4 位）</label>
+        <input type="password" id="reg-password" placeholder="设置密码" autocomplete="new-password" />
+      </div>
+      <button class="btn btn-success btn-full" onclick="doRegister()">注册</button>
+    </div>
+  </div>
+</div><!-- /auth-section -->
+
+
+<!-- ═══════════════ APP SECTION ════════════════ -->
+<div id="app-section" class="hidden">
+
+  <!-- Navbar -->
+  <div class="navbar">
+    <div class="user-info">
+      <span class="username" id="nav-username">—</span>
+      <span id="nav-badge" class="badge">—</span>
+    </div>
+    <button class="btn btn-ghost btn-sm" onclick="doLogout()">退出登录</button>
+  </div>
+
+  <!-- Calculator card -->
+  <div class="card">
+    <h3>计算器</h3>
+    <div id="alert-calc" class="alert"></div>
+
+    <div class="calc-display">
+      <div class="expr" id="calc-expr">&nbsp;</div>
+      <div id="calc-result">0</div>
+    </div>
+
+    <!-- Operation buttons (role-gated) -->
+    <div class="op-btns" id="op-btns">
+      <button class="op-btn" data-op="add"      onclick="selectOp(this)">+</button>
+      <button class="op-btn" data-op="subtract" onclick="selectOp(this)">−</button>
+      <button class="op-btn hidden" data-op="multiply" onclick="selectOp(this)">×</button>
+      <button class="op-btn hidden" data-op="divide"   onclick="selectOp(this)">÷</button>
+      <button class="op-btn hidden" data-op="power"    onclick="selectOp(this)">xʸ</button>
+      <button class="op-btn hidden" data-op="sqrt"     onclick="selectOp(this)">√</button>
+    </div>
+
+    <!-- Number pad -->
+    <div class="num-grid">
+      <button class="num-btn clear" onclick="clearCalc()">C</button>
+      <button class="num-btn back"  onclick="backspace()">⌫</button>
+      <button class="num-btn"       onclick="appendNum('.')">.</button>
+
+      <button class="num-btn" onclick="appendNum('7')">7</button>
+      <button class="num-btn" onclick="appendNum('8')">8</button>
+      <button class="num-btn" onclick="appendNum('9')">9</button>
+
+      <button class="num-btn" onclick="appendNum('4')">4</button>
+      <button class="num-btn" onclick="appendNum('5')">5</button>
+      <button class="num-btn" onclick="appendNum('6')">6</button>
+
+      <button class="num-btn" onclick="appendNum('1')">1</button>
+      <button class="num-btn" onclick="appendNum('2')">2</button>
+      <button class="num-btn" onclick="appendNum('3')">3</button>
+
+      <button class="num-btn zero" onclick="appendNum('0')">0</button>
+      <button class="num-btn equals" onclick="doCalculate()">=</button>
+    </div>
+
+    <!-- Negative toggle -->
+    <div style="margin-top:8px; display:flex; gap:8px;">
+      <button class="btn btn-ghost btn-sm" onclick="toggleSign()">+/−</button>
+      <span id="active-op-label" style="color:#64748b; font-size:.85rem; align-self:center;">未选运算</span>
+    </div>
+  </div>
+
+  <!-- History card -->
+  <div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+      <h3 style="margin:0">最近计算记录</h3>
+      <button class="btn btn-ghost btn-sm" onclick="loadHistory()">刷新</button>
+    </div>
+    <ul class="history-list" id="history-list">
+      <li style="color:#475569; font-size:.85rem;">暂无记录</li>
+    </ul>
+  </div>
+
+  <!-- ─── Admin panel (admin / superadmin) ─── -->
+  <div id="admin-panel" class="card hidden">
+    <h3>👮 管理面板</h3>
+    <div id="alert-admin" class="alert"></div>
+
+    <div id="user-table-wrap">
+      <p style="color:#475569; font-size:.85rem;">加载中…</p>
+    </div>
+  </div>
+
+  <!-- ─── Superadmin: rule tamper panel ─── -->
+  <div id="rules-panel" class="card hidden">
+    <h3>⚗️ 规则篡改面板</h3>
+    <p style="color:#64748b; font-size:.8rem; margin-bottom:14px;">
+      设置后，<strong style="color:#fde68a">所有用户</strong>计算该表达式时都会得到篡改结果（服务重启失效）。
+    </p>
+    <div id="alert-rules" class="alert"></div>
+
+    <!-- Add rule form -->
+    <div class="rule-inputs">
+      <input type="number" id="rule-a" placeholder="操作数 A" style="max-width:110px;" />
+      <select id="rule-op" style="max-width:100px;">
+        <option value="add">+ 加法</option>
+        <option value="subtract">− 减法</option>
+        <option value="multiply">× 乘法</option>
+        <option value="divide">÷ 除法</option>
+        <option value="power">xʸ 幂</option>
+        <option value="sqrt">√ 开方</option>
+      </select>
+      <input type="number" id="rule-b" placeholder="操作数 B" style="max-width:110px;" />
+      <span style="align-self:center; color:#94a3b8;">=</span>
+      <input type="text"   id="rule-result" placeholder="篡改结果" style="max-width:110px;" />
+    </div>
+    <button class="btn btn-warning btn-sm" onclick="addRule()">添加规则</button>
+
+    <hr class="section-sep" />
+
+    <h3>当前生效规则</h3>
+    <div id="rules-list">
+      <p style="color:#475569; font-size:.85rem;">暂无规则</p>
+    </div>
+  </div>
+
+</div><!-- /app-section -->
+
+
+<script>
+/* ═══════════════════════════════════════════
+   State
+═══════════════════════════════════════════ */
+let currentUser = null;       // { id, username, role }
+let calcA = "";               // first operand (string)
+let calcB = "";               // second operand (string)
+let selectedOp = null;        // "add" | "subtract" | ...
+let enteringB = false;        // whether we're entering the second operand
+let lastResult = "";          // last computed result
+
+/* ═══════════════════════════════════════════
+   Utilities
+═══════════════════════════════════════════ */
+function showAlert(id, msg, type = "error") {
+  const el = document.getElementById(id);
+  el.textContent = msg;
+  el.className = `alert alert-${type} show`;
+}
+function clearAlert(id) {
+  const el = document.getElementById(id);
+  el.className = "alert";
+  el.textContent = "";
+}
+
+async function api(method, path, body) {
+  const opts = { method, headers: { "Content-Type": "application/json" } };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(path, opts);
+  const data = await res.json();
+  return { status: res.status, data };
+}
+
+function roleBadge(role, banned) {
+  if (banned) return '<span class="badge badge-banned">已封禁</span>';
+  const map = {
+    guest:      "badge-guest",
+    member:     "badge-member",
+    admin:      "badge-admin",
+    superadmin: "badge-superadmin",
+  };
+  const labels = { guest: "游客", member: "会员", admin: "管理员", superadmin: "超管" };
+  return `<span class="badge ${map[role] || ''}">${labels[role] || role}</span>`;
+}
+
+/* ═══════════════════════════════════════════
+   Boot: check session
+═══════════════════════════════════════════ */
+async function boot() {
+  const { data } = await api("GET", "/api/me");
+  if (data.ok && data.user) {
+    currentUser = data.user;
+    showApp();
+  } else {
+    showAuth();
+  }
+}
+
+/* ═══════════════════════════════════════════
+   Auth section
+═══════════════════════════════════════════ */
+function showAuth() {
+  document.getElementById("auth-section").classList.remove("hidden");
+  document.getElementById("app-section").classList.add("hidden");
+  clearAlert("alert-auth");
+}
+function showApp() {
+  document.getElementById("auth-section").classList.add("hidden");
+  document.getElementById("app-section").classList.remove("hidden");
+  applyRoleUI();
+  loadHistory();
+  if (["admin", "superadmin"].includes(currentUser.role)) {
+    document.getElementById("admin-panel").classList.remove("hidden");
+    loadUsers();
+  }
+  if (currentUser.role === "superadmin") {
+    document.getElementById("rules-panel").classList.remove("hidden");
+    loadRules();
+  }
+}
+
+function switchTab(tab) {
+  document.querySelectorAll(".tab-btn").forEach((b, i) => {
+    b.classList.toggle("active", (i === 0 && tab === "login") || (i === 1 && tab === "register"));
+  });
+  document.getElementById("login-form").classList.toggle("hidden", tab !== "login");
+  document.getElementById("register-form").classList.toggle("hidden", tab !== "register");
+  clearAlert("alert-auth");
+}
+
+async function doLogin() {
+  const username = document.getElementById("login-username").value.trim();
+  const password = document.getElementById("login-password").value;
+  if (!username || !password) { showAlert("alert-auth", "请填写用户名和密码"); return; }
+  clearAlert("alert-auth");
+
+  const { status, data } = await api("POST", "/api/login", { username, password });
+  if (data.ok) {
+    currentUser = data.user;
+    showApp();
+  } else {
+    showAlert("alert-auth", data.error || "登录失败");
+  }
+}
+
+async function doRegister() {
+  const username = document.getElementById("reg-username").value.trim();
+  const password = document.getElementById("reg-password").value;
+  if (!username || !password) { showAlert("alert-auth", "请填写用户名和密码"); return; }
+  clearAlert("alert-auth");
+
+  const { status, data } = await api("POST", "/api/register", { username, password });
+  if (data.ok) {
+    showAlert("alert-auth", "注册成功！请登录", "success");
+    switchTab("login");
+    document.getElementById("login-username").value = username;
+  } else {
+    showAlert("alert-auth", data.error || "注册失败");
+  }
+}
+
+async function doLogout() {
+  await api("POST", "/api/logout");
+  currentUser = null;
+  resetCalcState();
+  document.getElementById("admin-panel").classList.add("hidden");
+  document.getElementById("rules-panel").classList.add("hidden");
+  showAuth();
+}
+
+/* ═══════════════════════════════════════════
+   Role-based UI
+═══════════════════════════════════════════ */
+const OP_VISIBILITY = {
+  guest:      ["add", "subtract"],
+  member:     ["add", "subtract", "multiply", "divide"],
+  admin:      ["add", "subtract", "multiply", "divide"],
+  superadmin: ["add", "subtract", "multiply", "divide", "power", "sqrt"],
+};
+
+function applyRoleUI() {
+  const role = currentUser.role;
+  // Navbar
+  document.getElementById("nav-username").textContent = currentUser.username;
+  const badgeEl = document.getElementById("nav-badge");
+  const labels = { guest: "游客", member: "会员", admin: "管理员", superadmin: "超管" };
+  const classes = { guest: "badge-guest", member: "badge-member", admin: "badge-admin", superadmin: "badge-superadmin" };
+  badgeEl.textContent = labels[role] || role;
+  badgeEl.className = `badge ${classes[role] || ''}`;
+
+  // Show/hide op buttons
+  const allowed = OP_VISIBILITY[role] || [];
+  document.querySelectorAll(".op-btn").forEach(btn => {
+    const op = btn.dataset.op;
+    btn.classList.toggle("hidden", !allowed.includes(op));
+  });
+
+  // Reset selected op if no longer allowed
+  if (selectedOp && !allowed.includes(selectedOp)) {
+    selectedOp = null;
+    document.querySelectorAll(".op-btn").forEach(b => b.classList.remove("selected"));
+    updateOpLabel();
+  }
+}
+
+/* ═══════════════════════════════════════════
+   Calculator logic
+═══════════════════════════════════════════ */
+function resetCalcState() {
+  calcA = ""; calcB = ""; selectedOp = null; enteringB = false; lastResult = "";
+  document.getElementById("calc-result").textContent = "0";
+  document.getElementById("calc-expr").innerHTML = "&nbsp;";
+  document.querySelectorAll(".op-btn").forEach(b => b.classList.remove("selected"));
+  updateOpLabel();
+}
+
+function updateDisplay() {
+  const resultEl = document.getElementById("calc-result");
+  const exprEl   = document.getElementById("calc-expr");
+  if (enteringB) {
+    resultEl.textContent = calcB || "0";
+    const sym = opSymbol(selectedOp);
+    exprEl.textContent = `${calcA} ${sym}`;
+  } else {
+    resultEl.textContent = calcA || "0";
+    exprEl.innerHTML = "&nbsp;";
+  }
+}
+
+function opSymbol(op) {
+  return { add:"+", subtract:"−", multiply:"×", divide:"÷", power:"^", sqrt:"√" }[op] || op;
+}
+
+function updateOpLabel() {
+  const names = { add:"加法", subtract:"减法", multiply:"乘法", divide:"除法", power:"幂运算", sqrt:"开方" };
+  document.getElementById("active-op-label").textContent =
+    selectedOp ? `已选：${names[selectedOp] || selectedOp}` : "未选运算";
+}
+
+function selectOp(btn) {
+  selectedOp = btn.dataset.op;
+  document.querySelectorAll(".op-btn").forEach(b => b.classList.remove("selected"));
+  btn.classList.add("selected");
+  updateOpLabel();
+  clearAlert("alert-calc");
+
+  if (selectedOp === "sqrt") {
+    // Unary: treat current display as A, auto-compute
+    if (calcA === "" && lastResult !== "") calcA = lastResult;
+    enteringB = false;
+    updateDisplay();
+  } else {
+    // Binary: if we already have a result, start from it
+    if (calcA === "" && lastResult !== "") calcA = lastResult;
+    enteringB = true;
+    calcB = "";
+    updateDisplay();
+  }
+}
+
+function appendNum(ch) {
+  clearAlert("alert-calc");
+  if (selectedOp === "sqrt") {
+    // Modify A
+    if (ch === "." && calcA.includes(".")) return;
+    if (calcA.length >= 15) return;
+    calcA += ch;
+  } else if (enteringB) {
+    if (ch === "." && calcB.includes(".")) return;
+    if (calcB.replace("-","").length >= 15) return;
+    calcB += ch;
+  } else {
+    if (ch === "." && calcA.includes(".")) return;
+    if (calcA.replace("-","").length >= 15) return;
+    calcA += ch;
+  }
+  updateDisplay();
+}
+
+function clearCalc() {
+  resetCalcState();
+  clearAlert("alert-calc");
+}
+
+function backspace() {
+  clearAlert("alert-calc");
+  if (enteringB && selectedOp !== "sqrt") {
+    calcB = calcB.slice(0, -1);
+  } else {
+    calcA = calcA.slice(0, -1);
+  }
+  updateDisplay();
+}
+
+function toggleSign() {
+  if (enteringB && selectedOp !== "sqrt") {
+    calcB = calcB.startsWith("-") ? calcB.slice(1) : (calcB ? "-" + calcB : "");
+  } else {
+    calcA = calcA.startsWith("-") ? calcA.slice(1) : (calcA ? "-" + calcA : "");
+  }
+  updateDisplay();
+}
+
+async function doCalculate() {
+  clearAlert("alert-calc");
+
+  if (!selectedOp) {
+    showAlert("alert-calc", "请先选择运算符（上方按钮）");
+    return;
+  }
+
+  const a = parseFloat(calcA);
+  if (isNaN(a)) { showAlert("alert-calc", "请输入操作数 A"); return; }
+
+  let body = { operation: selectedOp, a };
+
+  if (selectedOp !== "sqrt") {
+    const b = parseFloat(calcB);
+    if (isNaN(b)) { showAlert("alert-calc", "请输入操作数 B"); return; }
+    body.b = b;
+  }
+
+  const { status, data } = await api("POST", "/api/calculate", body);
+  if (data.ok) {
+    lastResult = data.result;
+    document.getElementById("calc-result").textContent = data.result;
+    document.getElementById("calc-expr").textContent = `${data.expression} =`;
+    // Reset for next calculation, keep result as new A
+    calcA = data.result;
+    calcB = "";
+    enteringB = false;
+    selectedOp = null;
+    document.querySelectorAll(".op-btn").forEach(b => b.classList.remove("selected"));
+    updateOpLabel();
+    // Refresh history
+    loadHistory();
+  } else {
+    showAlert("alert-calc", data.error || "计算失败");
+  }
+}
+
+/* ═══════════════════════════════════════════
+   History
+═══════════════════════════════════════════ */
+async function loadHistory() {
+  const { data } = await api("GET", "/api/history");
+  const list = document.getElementById("history-list");
+  if (!data.ok || !data.history || data.history.length === 0) {
+    list.innerHTML = '<li style="color:#475569; font-size:.85rem;">暂无记录</li>';
+    return;
+  }
+  list.innerHTML = data.history.map(h => `
+    <li>
+      <span>${h.expression}</span>
+      <span class="time">${h.created_at.replace("T"," ").slice(0,16)}</span>
+    </li>
+  `).join("");
+}
+
+/* ═══════════════════════════════════════════
+   Admin panel
+═══════════════════════════════════════════ */
+async function loadUsers() {
+  clearAlert("alert-admin");
+  const { data } = await api("GET", "/api/users");
+  const wrap = document.getElementById("user-table-wrap");
+  if (!data.ok) {
+    wrap.innerHTML = `<p style="color:#ef4444">${data.error}</p>`;
+    return;
+  }
+
+  const users = data.users;
+  if (users.length === 0) {
+    wrap.innerHTML = '<p style="color:#475569">暂无用户</p>';
+    return;
+  }
+
+  let rows = users.map(u => {
+    const isSelf = u.id === currentUser.id;
+    const isProtected = ["admin","superadmin"].includes(u.role) && currentUser.role === "admin";
+    const canEdit = !isSelf && !isProtected;
+
+    // Role selector (only guest/member for admin, full for superadmin)
+    const roleOptions = currentUser.role === "superadmin"
+      ? `<option value="guest">游客</option><option value="member">会员</option>
+         <option value="admin">管理员</option><option value="superadmin">超管</option>`
+      : `<option value="guest">游客</option><option value="member">会员</option>`;
+
+    const actions = canEdit ? `
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+        <select id="role-sel-${u.id}" class="btn btn-ghost btn-sm" style="padding:4px 8px;">
+          ${roleOptions}
+        </select>
+        <button class="btn btn-primary btn-sm" onclick="setRole(${u.id})">改角色</button>
+        ${u.banned
+          ? `<button class="btn btn-success btn-sm" onclick="setBan(${u.id},false)">解封</button>`
+          : `<button class="btn btn-danger btn-sm" onclick="setBan(${u.id},true)">封禁</button>`}
+      </div>
+    ` : `<span style="color:#475569;font-size:.8rem;">${isSelf ? "（自己）" : "（受保护）"}</span>`;
+
+    return `
+      <tr>
+        <td><strong>${escHtml(u.username)}</strong></td>
+        <td>${roleBadge(u.role, u.banned)}</td>
+        <td>${actions}</td>
+      </tr>`;
+  }).join("");
+
+  wrap.innerHTML = `
+    <table class="user-table">
+      <thead><tr>
+        <th>用户名</th><th>角色/状态</th><th>操作</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+
+  // Set selectors to current role
+  users.forEach(u => {
+    const sel = document.getElementById(`role-sel-${u.id}`);
+    if (sel) sel.value = u.role;
+  });
+}
+
+async function setRole(targetId) {
+  clearAlert("alert-admin");
+  const sel = document.getElementById(`role-sel-${targetId}`);
+  const newRole = sel ? sel.value : "";
+  const { data } = await api("POST", "/api/admin/role", { target_id: targetId, role: newRole });
+  if (data.ok) {
+    showAlert("alert-admin", data.message || "角色已更新", "success");
+    loadUsers();
+  } else {
+    showAlert("alert-admin", data.error || "操作失败");
+  }
+}
+
+async function setBan(targetId, banned) {
+  clearAlert("alert-admin");
+  const { data } = await api("POST", "/api/admin/ban", { target_id: targetId, banned });
+  if (data.ok) {
+    showAlert("alert-admin", data.message || "操作成功", "success");
+    loadUsers();
+  } else {
+    showAlert("alert-admin", data.error || "操作失败");
+  }
+}
+
+/* ═══════════════════════════════════════════
+   Rules panel (superadmin)
+═══════════════════════════════════════════ */
+async function loadRules() {
+  const { data } = await api("GET", "/api/rules");
+  const container = document.getElementById("rules-list");
+  if (!data.ok) { container.innerHTML = `<p style="color:#ef4444">${data.error}</p>`; return; }
+  const rules = data.rules;
+  if (!rules || rules.length === 0) {
+    container.innerHTML = '<p style="color:#475569;font-size:.85rem;">暂无生效规则</p>';
+    return;
+  }
+  const syms = { add:"+", subtract:"−", multiply:"×", divide:"÷", power:"^", sqrt:"√" };
+  container.innerHTML = rules.map(r => {
+    const expr = r.operation === "sqrt"
+      ? `√${r.a}`
+      : `${r.a} ${syms[r.operation]||r.operation} ${r.b}`;
+    const bVal = r.b !== null && r.b !== undefined ? r.b : null;
+    return `
+      <div class="rule-row">
+        <span class="expr">${expr} = <strong>${escHtml(String(r.result))}</strong></span>
+        <button class="btn btn-danger btn-sm"
+          onclick="deleteRule(${r.a}, '${r.operation}', ${bVal !== null ? bVal : 'null'})">
+          删除
+        </button>
+      </div>`;
+  }).join("");
+}
+
+async function addRule() {
+  clearAlert("alert-rules");
+  const a = document.getElementById("rule-a").value.trim();
+  const op = document.getElementById("rule-op").value;
+  const bRaw = document.getElementById("rule-b").value.trim();
+  const result = document.getElementById("rule-result").value.trim();
+
+  if (a === "" || !op || !result) {
+    showAlert("alert-rules", "请填写操作数 A、运算符和篡改结果");
+    return;
+  }
+
+  const body = { a: parseFloat(a), operation: op, result };
+  if (op !== "sqrt" && bRaw !== "") body.b = parseFloat(bRaw);
+  if (op !== "sqrt" && bRaw === "") { showAlert("alert-rules", "二元运算需要填写操作数 B"); return; }
+
+  const { data } = await api("POST", "/api/rules", body);
+  if (data.ok) {
+    showAlert("alert-rules", "规则已添加", "success");
+    document.getElementById("rule-a").value = "";
+    document.getElementById("rule-b").value = "";
+    document.getElementById("rule-result").value = "";
+    loadRules();
+  } else {
+    showAlert("alert-rules", data.error || "设置失败");
+  }
+}
+
+async function deleteRule(a, op, b) {
+  clearAlert("alert-rules");
+  const body = { a, operation: op };
+  if (b !== null) body.b = b;
+  const { data } = await api("POST", "/api/rules/delete", body);
+  if (data.ok) {
+    showAlert("alert-rules", "规则已删除", "success");
+    loadRules();
+  } else {
+    showAlert("alert-rules", data.error || "删除失败");
+  }
+}
+
+/* ═══════════════════════════════════════════
+   Keyboard support
+═══════════════════════════════════════════ */
+document.addEventListener("keydown", e => {
+  if (!currentUser) return;
+  if (["0","1","2","3","4","5","6","7","8","9"].includes(e.key)) appendNum(e.key);
+  else if (e.key === ".") appendNum(".");
+  else if (e.key === "Backspace") backspace();
+  else if (e.key === "Escape") clearCalc();
+  else if (e.key === "Enter" || e.key === "=") doCalculate();
+});
+
+/* ═══════════════════════════════════════════
+   Helpers
+═══════════════════════════════════════════ */
+function escHtml(s) {
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+/* ═══════════════════════════════════════════
+   Init
+═══════════════════════════════════════════ */
+boot();
+</script>
+</body>
+</html>

@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Noetica | The Architecture of Thought</title>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --color-bg: #020305;
+            --color-blob-1: #0A1C2C;
+            --color-blob-2: #05101E;
+            --color-blob-3: #111A22;
+            --color-blob-4: #0C1E2B;
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --glass-highlight: rgba(255, 255, 255, 0.15);
+            --glass-bg: rgba(6, 9, 15, 0.3);
+            --text-main: #E5E7EB;
+            --text-muted: #8E96A4;
+            --accent: #B0C4DE;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Manrope', sans-serif;
+        }
+
+        body {
+            background-color: var(--color-bg);
+            color: var(--text-main);
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        ::selection {
+            background: var(--glass-highlight);
+            color: #fff;
+        }
+
+        /* Ambient Liquid Background */
+        .liquid-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: -2;
+            overflow: hidden;
+            background: var(--color-bg);
+            filter: blur(40px);
+            transform: translateZ(0);
+        }
+
+        .blob {
+            position: absolute;
+            border-radius: 50%;
+            will-change: transform, border-radius;
+            mix-blend-mode: screen;
+        }
+
+        .blob-1 {
+            width: 60vw;
+            height: 60vw;
+            background: radial-gradient(circle, var(--color-blob-1) 0%, transparent 70%);
+            top: -10%;
+            left: -10%;
+            animation: liquid-morph 25s ease-in-out infinite alternate, float 20s ease-in-out infinite;
+        }
+
+        .blob-2 {
+            width: 70vw;
+            height: 70vw;
+            background: radial-gradient(circle, var(--color-blob-2) 0%, transparent 70%);
+            bottom: -20%;
+            right: -10%;
+            animation: liquid-morph 30s ease-in-out infinite alternate-reverse, float 25s ease-in-out infinite alternate;
+        }
+
+        .blob-3 {
+            width: 50vw;
+            height: 50vw;
+            background: radial-gradient(circle, var(--color-blob-3) 0%, transparent 70%);
+            top: 40%;
+            left: 30%;
+            animation: liquid-morph 20s ease-in-out infinite alternate, float 22s ease-in-out infinite alternate-reverse;
+        }
+
+        .blob-4 {
+            width: 45vw;
+            height: 45vw;
+            background: radial-gradient(circle, var(--color-blob-4) 0%, transparent 60%);
+            top: 10%;
+            right: 15%;
+            animation: liquid-morph 28s ease-in-out infinite alternate-reverse, float 18s ease-in-out infinite alternate;
+        }
+
+        /* Noise Texture for realism */
+        .noise-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            z-index: -1;
+            opacity: 0.12;
+            background: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+        }
+
+        /* Mouse Spotlight Effect */
+        .global-light {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            background: radial-gradient(600px circle at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(255, 255, 255, 0.03), transparent 40%);
+            z-index: 100;
+            transition: background 0.1s ease;
+        }
+
+        @keyframes liquid-morph {
+            0% { border-radius: 40% 60% 70% 30% / 40% 40% 60% 50%; }
+            34% { border-radius: 70% 30% 50% 50% / 30% 30% 70% 70%; }
+            67% { border-radius: 100% 60% 60% 100% / 100% 100% 60% 60%; }
+            100% { border-radius: 30% 70% 40% 60% / 60% 30% 70% 40%; }
+        }
+
+        @keyframes float {
+            0% { transform: translate(0, 0) scale(1) rotate(0deg); }
+            33% { transform: translate(5vw, 5vh) scale(1.05) rotate(5deg); }
+            66% { transform: translate(-3vw, 8vh) scale(0.95) rotate(-2deg); }
+            100% { transform: translate(0, 0) scale(1) rotate(0deg); }
+        }
+
+        /* Navigation */
+        nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 2rem 5%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            z-index: 10;
+        }
+
+        .logo {
+            font-size: 1.25rem;
+            font-weight: 500;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .logo-mark {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--text-main);
+            box-shadow: 0 0 10px rgba(255,255,255,0.5);
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2.5rem;
+        }
+
+        .nav-links a {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 400;
+            letter-spacing: 0.05em;
+            transition: color 0.3s ease;
+        }
+
+        .nav-links a:hover {
+            color: var(--text-main);
+        }
+
+        /* Glassmorphism Classes */
+        .glass-panel {
+            background: linear-gradient(135deg, rgba(20, 24, 32, 0.45) 0%, rgba(10, 12, 16, 0.25) 100%);
+            backdrop-filter: blur(24px) saturate(130%);
+            -webkit-backdrop-filter: blur(24px) saturate(130%);
+            border: 1px solid var(--glass-border);
+            border-top: 1px solid rgba(255, 255, 255, 0.12);
+            border-left: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+            border-radius: 24px;
+            position: relative;
+            overflow: hidden;
+            transform-style: preserve-3d;
+        }
+        
+        .glass-panel::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+            opacity: 0.08;
+            mix-blend-mode: overlay;
+            z-index: 1;
+        }
+
+        /* Interactive glow inside cards */
+        .glass-panel::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(800px circle at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(255, 255, 255, 0.08), transparent 40%);
+            z-index: 2;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+            pointer-events: none;
+        }
+
+        .glass-panel:hover::after {
+            opacity: 1;
+        }
+
+        .glass-content {
+            position: relative;
+            z-index: 3;
+            transform: translateZ(30px); /* 3D effect on hover */
+        }
+
+        /* Hero Section */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 0 5%;
+            position: relative;
+        }
+
+        .hero-card {
+            max-width: 900px;
+            text-align: center;
+            padding: 5rem 4rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.4rem 1.2rem;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--accent);
+            font-size: 0.8rem;
+            letter-spacing: 0.1em;
+            margin-bottom: 2rem;
+            text-transform: uppercase;
+        }
+
+        .hero h1 {
+            font-size: clamp(3rem, 6vw, 5.5rem);
+            font-weight: 300;
+            line-height: 1.1;
+            letter-spacing: -0.03em;
+            margin-bottom: 1.5rem;
+            background: linear-gradient(180deg, #FFFFFF 0%, rgba(255, 255, 255, 0.5) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero h1 span {
+            font-weight: 500;
+            font-style: italic;
+            background: linear-gradient(135deg, var(--accent) 0%, rgba(255, 255, 255, 0.7) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero p {
+            font-size: 1.1rem;
+            line-height: 1.6;
+            color: var(--text-muted);
+            max-width: 600px;
+            margin: 0 auto 3rem auto;
+            font-weight: 300;
+        }
+
+        .cta-btn {
+            position: relative;
+            padding: 1rem 2.5rem;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 30px;
+            color: #fff;
+            font-size: 0.95rem;
+            letter-spacing: 0.05em;
+            cursor: pointer;
+            overflow: hidden;
+            transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+            backdrop-filter: blur(10px);
+            text-decoration: none;
+        }
+
+        .cta-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.6s ease;
+        }
+
+        .cta-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.4);
+            box-shadow: 0 0 20px rgba(176, 196, 222, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .cta-btn:hover::before {
+            left: 100%;
+        }
+
+        /* Features Section */
+        .features {
+            padding: 8rem 5%;
+            position: relative;
+        }
+
+        .section-header {
+            text-align: center;
+            margin-bottom: 5rem;
+        }
+
+        .section-header h2 {
+            font-size: 2.5rem;
+            font-weight: 300;
+            color: var(--text-main);
+            letter-spacing: -0.02em;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 2.5rem;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .feature-card {
+            padding: 3rem 2.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            cursor: default;
+            transition: transform 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+        }
+
+        /* For 3D Tilt effect initialized by JS */
+        .feature-card.js-tilt {
+            transform-style: preserve-3d;
+        }
+
+        .feature-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 16px;
+            background: linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.02));
+            border: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1rem;
+            box-shadow: inset 0 2px 4px rgba(255,255,255,0.1);
+        }
+
+        .feature-icon svg {
+            width: 24px;
+            height: 24px;
+            stroke: var(--accent);
+            stroke-width: 1.5;
+            fill: none;
+        }
+
+        .feature-card h3 {
+            font-size: 1.3rem;
+            font-weight: 500;
+            color: #fff;
+            letter-spacing: -0.01em;
+        }
+
+        .feature-card p {
+            font-size: 0.95rem;
+            line-height: 1.6;
+            color: var(--text-muted);
+            font-weight: 300;
+        }
+
+        /* Abstract structural visual in feature card */
+        .feature-visual {
+            margin-top: auto;
+            height: 120px;
+            border-radius: 12px;
+            background: rgba(0,0,0,0.2);
+            border: 1px solid rgba(255,255,255,0.03);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .feature-visual::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 150%;
+            height: 150%;
+            background: radial-gradient(circle, rgba(255,255,255,0.05) 0%, transparent 60%);
+            transform: translate(-50%, -50%);
+        }
+
+        /* Footer */
+        footer {
+            padding: 4rem 5%;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 5rem;
+            backdrop-filter: blur(10px);
+        }
+
+        .footer-logo {
+            font-size: 1rem;
+            color: var(--text-muted);
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+        }
+
+        .footer-links {
+            display: flex;
+            gap: 2rem;
+        }
+
+        .footer-links a {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.85rem;
+            transition: color 0.3s ease;
+        }
+
+        .footer-links a:hover {
+            color: #fff;
+        }
+
+        @media (max-width: 768px) {
+            .hero-card {
+                padding: 3rem 1.5rem;
+            }
+            .nav-links {
+                display: none;
+            }
+            footer {
+                flex-direction: column;
+                gap: 2rem;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Liquid Glassmorphism Background -->
+    <div class="liquid-canvas">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
+        <div class="blob blob-4"></div>
+    </div>
+    <div class="noise-overlay"></div>
+    <div class="global-light" id="global-light"></div>
+
+    <nav>
+        <div class="logo">
+            <div class="logo-mark"></div>
+            Noetica
+        </div>
+        <div class="nav-links">
+            <a href="#">Architecture</a>
+            <a href="#">Capabilities</a>
+            <a href="#">Research</a>
+            <a href="#">Company</a>
+        </div>
+    </nav>
+
+    <main>
+        <!-- Hero Section -->
+        <section class="hero">
+            <div class="glass-panel hero-card tilt-element">
+                <div class="glass-content">
+                    <div class="badge">Model Beta v2.4</div>
+                    <h1>Cognition, <span>Crystallized</span>.</h1>
+                    <p>Transcending traditional linguistic limits. We architect deep-state fluid neural models that perceive, reason, and adapt with profound, crystalline clarity.</p>
+                    <a href="#" class="cta-btn">Initialize Sequence</a>
+                </div>
+            </div>
+        </section>
+
+        <!-- Features Section -->
+        <section class="features">
+            <div class="section-header">
+                <h2>The Anatomy of Intelligence</h2>
+            </div>
+            
+            <div class="features-grid">
+                <!-- Feature 1 -->
+                <div class="glass-panel feature-card tilt-element">
+                    <div class="glass-content">
+                        <div class="feature-icon">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M21 12A9 9 0 0 1 12 21M3 12A9 9 0 0 1 12 3m0 0v18m-9-9h18"/>
+                            </svg>
+                        </div>
+                        <h3>Neuro-Fluid Routing</h3>
+                        <p>Deep context pathways dynamically reshape themselves in real-time. Experience zero-latency semantic traversal across infinite contextual dimensions.</p>
+                        <div class="feature-visual" style="background: linear-gradient(45deg, rgba(10, 28, 44, 0.4), rgba(5, 16, 30, 0.1));"></div>
+                    </div>
+                </div>
+
+                <!-- Feature 2 -->
+                <div class="glass-panel feature-card tilt-element">
+                    <div class="glass-content">
+                        <div class="feature-icon">
+                            <svg viewBox="0 0 24 24">
+                                <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                                <polyline points="2 17 12 22 22 17"></polyline>
+                                <polyline points="2 12 12 17 22 12"></polyline>
+                            </svg>
+                        </div>
+                        <h3>Refractive Logic</h3>
+                        <p>By splitting complex reasoning through multi-agent paradigms, our models illuminate unseen correlations, drastically reducing hallucinatory artifacts.</p>
+                        <div class="feature-visual" style="background: linear-gradient(135deg, rgba(18, 30, 40, 0.4), rgba(0, 0, 0, 0.2));"></div>
+                    </div>
+                </div>
+
+                <!-- Feature 3 -->
+                <div class="glass-panel feature-card tilt-element">
+                    <div class="glass-content">
+                        <div class="feature-icon">
+                            <svg viewBox="0 0 24 24">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                                <polyline points="21 15 16 10 5 21"></polyline>
+                            </svg>
+                        </div>
+                        <h3>Glass-Box Observability</h3>
+                        <p>Absolute alignment achieved through transparent mechanization. Monitor every parametric state shift and reasoning branch as it occurs.</p>
+                        <div class="feature-visual" style="background: linear-gradient(90deg, rgba(8, 20, 30, 0.3), rgba(20, 25, 35, 0.3));"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="footer-logo">Noetica AI, Inc. © 2024</div>
+        <div class="footer-links">
+            <a href="#">Privacy Protocol</a>
+            <a href="#">Terms of Architecture</a>
+            <a href="#">System Status</a>
+        </div>
+    </footer>
+
+    <script>
+        // Global ambient light tracking mouse
+        const globalLight = document.getElementById('global-light');
+        
+        document.addEventListener('mousemove', (e) => {
+            const x = e.clientX;
+            const y = e.clientY;
+            globalLight.style.setProperty('--mouse-x', `${x}px`);
+            globalLight.style.setProperty('--mouse-y', `${y}px`);
+        });
+
+        // 3D Tilt and intrinsic glass illumination effect for panels
+        const tiltElements = document.querySelectorAll('.tilt-element');
+
+        tiltElements.forEach(el => {
+            el.addEventListener('mousemove', (e) => {
+                const rect = el.getBoundingClientRect();
+                
+                // For internal glass highlight
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                el.style.setProperty('--mouse-x', `${x}px`);
+                el.style.setProperty('--mouse-y', `${y}px`);
+
+                // For 3D Tilt
+                const centerX = rect.width / 2;
+                const centerY = rect.height / 2;
+                
+                // Calculate rotation (max 10 degrees)
+                const rotateX = ((centerY - y) / centerY) * 8;
+                const rotateY = ((x - centerX) / centerX) * 8;
+
+                el.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.02, 1.02, 1.02)`;
+                
+                // Adjust border reflection based on mouse position
+                const borderX = (x / rect.width) * 100;
+                const borderY = (y / rect.height) * 100;
+                el.style.borderImage = `radial-gradient(circle at ${borderX}% ${borderY}%, rgba(255,255,255,0.4), rgba(255,255,255,0.05)) 1`;
+            });
+
+            el.addEventListener('mouseleave', () => {
+                el.style.transform = `perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)`;
+                el.style.borderImage = 'none';
+            });
+        });
+
+        // Add slow parallax effect to background blobs based on scroll
+        const canvas = document.querySelector('.liquid-canvas');
+        window.addEventListener('scroll', () => {
+            const scrollY = window.scrollY;
+            canvas.style.transform = `translate3d(0, ${scrollY * 0.15}px, 0)`;
+        });
+    </script>
+</body>
+</html>

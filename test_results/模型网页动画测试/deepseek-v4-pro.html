@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analog Clock - 10:10</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #ffffff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Georgia', 'Times New Roman', serif;
+            padding: 20px;
+        }
+
+        .clock-container {
+            width: min(85vw, 85vh, 420px);
+            aspect-ratio: 1 / 1;
+            position: relative;
+        }
+
+        .clock-container svg {
+            width: 100%;
+            height: 100%;
+            display: block;
+            filter: drop-shadow(0 4px 20px rgba(0, 0, 0, 0.12));
+        }
+
+        .second-hand-group {
+            animation: sweep 60s linear infinite;
+            transform-origin: 200px 200px;
+        }
+
+        @keyframes sweep {
+            from {
+                transform: rotate(0deg);
+            }
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        @media (max-width: 360px) {
+            .clock-container {
+                width: 92vw;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="clock-container">
+        <svg viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+            <defs>
+                <radialGradient id="faceGradient" cx="50%" cy="50%" r="50%" fx="48%" fy="48%">
+                    <stop offset="0%" stop-color="#ffffff"/>
+                    <stop offset="85%" stop-color="#fafafa"/>
+                    <stop offset="100%" stop-color="#f0f0f0"/>
+                </radialGradient>
+                <filter id="innerShadow" x="-10%" y="-10%" width="120%" height="120%">
+                    <feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#000000" flood-opacity="0.06"/>
+                </filter>
+            </defs>
+
+            <circle cx="200" cy="200" r="194" fill="#e8e8e8" stroke="#d0d0d0" stroke-width="1"/>
+
+            <circle cx="200" cy="200" r="190" fill="url(#faceGradient)" stroke="#2c3e50" stroke-width="2.5" filter="url(#innerShadow)"/>
+
+            <circle cx="200" cy="200" r="174" fill="none" stroke="#3a3a3a" stroke-width="1.8" stroke-dasharray="2.5 15.724"/>
+
+            <circle cx="200" cy="200" r="168" fill="none" stroke="#2c3e50" stroke-width="4.5" stroke-dasharray="5.5 82.465" stroke-linecap="round"/>
+
+            <text x="200" y="65" text-anchor="middle" dominant-baseline="central" font-size="22" fill="#1a1a1a" font-family="'Georgia', 'Times New Roman', serif" font-weight="bold">12</text>
+            <text x="271" y="82" text-anchor="middle" dominant-baseline="central" font-size="20" fill="#2c2c2c" font-family="'Georgia', 'Times New Roman', serif">1</text>
+            <text x="322" y="132" text-anchor="middle" dominant-baseline="central" font-size="20" fill="#2c2c2c" font-family="'Georgia', 'Times New Roman', serif">2</text>
+            <text x="341" y="200" text-anchor="middle" dominant-baseline="central" font-size="22" fill="#1a1a1a" font-family="'Georgia', 'Times New Roman', serif" font-weight="bold">3</text>
+            <text x="322" y="268" text-anchor="middle" dominant-baseline="central" font-size="20" fill="#2c2c2c" font-family="'Georgia', 'Times New Roman', serif">4</text>
+            <text x="271" y="318" text-anchor="middle" dominant-baseline="central" font-size="20" fill="#2c2c2c" font-family="'Georgia', 'Times New Roman', serif">5</text>
+            <text x="200" y="336" text-anchor="middle" dominant-baseline="central" font-size="22" fill="#1a1a1a" font-family="'Georgia', 'Times New Roman', serif" font-weight="bold">6</text>
+            <text x="129" y="318" text-anchor="middle" dominant-baseline="central" font-size="20" fill="#2c2c2c" font-family="'Georgia', 'Times New Roman', serif">7</text>
+            <text x="78" y="268" text-anchor="middle" dominant-baseline="central" font-size="20" fill="#2c2c2c" font-family="'Georgia', 'Times New Roman', serif">8</text>
+            <text x="59" y="200" text-anchor="middle" dominant-baseline="central" font-size="22" fill="#1a1a1a" font-family="'Georgia', 'Times New Roman', serif" font-weight="bold">9</text>
+            <text x="78" y="132" text-anchor="middle" dominant-baseline="central" font-size="20" fill="#2c2c2c" font-family="'Georgia', 'Times New Roman', serif">10</text>
+            <text x="129" y="82" text-anchor="middle" dominant-baseline="central" font-size="20" fill="#2c2c2c" font-family="'Georgia', 'Times New Roman', serif">11</text>
+
+            <line x1="200" y1="200" x2="200" y2="98" stroke="#1a1a1a" stroke-width="6.5" stroke-linecap="round" transform="rotate(305, 200, 200)"/>
+
+            <line x1="200" y1="200" x2="200" y2="56" stroke="#2c3e50" stroke-width="4" stroke-linecap="round" transform="rotate(60, 200, 200)"/>
+
+            <g class="second-hand-group">
+                <line x1="200" y1="218" x2="200" y2="32" stroke="#d42e2e" stroke-width="2" stroke-linecap="round"/>
+                <circle cx="200" cy="195" r="4.5" fill="#d42e2e"/>
+            </g>
+
+            <circle cx="200" cy="200" r="9" fill="#1a1a1a"/>
+            <circle cx="200" cy="200" r="4" fill="#d42e2e"/>
+        </svg>
+    </div>
+</body>
+</html>

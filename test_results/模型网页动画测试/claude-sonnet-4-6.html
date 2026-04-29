@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Analog Clock</title>
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    background: #ffffff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    font-family: 'Georgia', serif;
+  }
+
+  .clock-container {
+    width: min(80vw, 80vh, 500px);
+    aspect-ratio: 1;
+  }
+
+  .clock {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, #ffffff, #e8e8e8);
+    border: min(1.5vw, 8px) solid #222;
+    box-shadow:
+      0 0 0 min(0.5vw, 3px) #555,
+      0 8px 30px rgba(0,0,0,0.3),
+      inset 0 2px 6px rgba(255,255,255,0.8),
+      inset 0 -2px 6px rgba(0,0,0,0.1);
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .clock-face {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    border-radius: 50%;
+  }
+
+  /* Hour markers */
+  .marker {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform-origin: 0 0;
+  }
+
+  .marker::after {
+    content: '';
+    position: absolute;
+    background: #222;
+    border-radius: 2px;
+  }
+
+  /* Numbers */
+  .number {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    text-align: center;
+  }
+
+  .number span {
+    display: inline-block;
+    font-size: min(4vw, 4vh, 22px);
+    font-weight: bold;
+    color: #222;
+    position: absolute;
+    transform: translate(-50%, -50%);
+  }
+
+  /* Tick marks */
+  .ticks {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+  }
+
+  .tick {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform-origin: 0 0;
+  }
+
+  .tick::after {
+    content: '';
+    position: absolute;
+    background: #555;
+    border-radius: 1px;
+    transform: translateX(-50%);
+  }
+
+  .tick.major::after {
+    width: min(0.8vw, 4px);
+    height: min(2.5vw, 12px);
+    top: min(-48%, -47%);
+    background: #222;
+    width: clamp(2px, 0.6vw, 4px);
+    height: clamp(8px, 2vw, 14px);
+    top: -47%;
+  }
+
+  .tick.minor::after {
+    width: clamp(1px, 0.3vw, 2px);
+    height: clamp(4px, 1vw, 7px);
+    top: -47%;
+    background: #888;
+  }
+
+  /* Hands */
+  .hands {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+  }
+
+  .hand {
+    position: absolute;
+    bottom: 50%;
+    left: 50%;
+    transform-origin: bottom center;
+    border-radius: 6px 6px 2px 2px;
+  }
+
+  .hand-hour {
+    width: clamp(4px, 1.2vw, 8px);
+    height: 28%;
+    background: #1a1a1a;
+    left: calc(50% - clamp(2px, 0.6vw, 4px));
+    transform: rotate(300deg); /* 10:10 => hour at 300deg (10 o'clock + 2 min offset) */
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    border-radius: 4px 4px 2px 2px;
+  }
+
+  .hand-minute {
+    width: clamp(3px, 0.8vw, 6px);
+    height: 40%;
+    background: #1a1a1a;
+    left: calc(50% - clamp(1.5px, 0.4vw, 3px));
+    transform: rotate(60deg); /* 10 minutes => 60deg */
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    border-radius: 4px 4px 2px 2px;
+  }
+
+  .hand-second {
+    width: clamp(1.5px, 0.4vw, 3px);
+    height: 44%;
+    background: #e63946;
+    left: calc(50% - clamp(0.75px, 0.2vw, 1.5px));
+    transform: rotate(0deg);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    border-radius: 3px 3px 1px 1px;
+    animation: rotateSec 60s linear infinite;
+  }
+
+  /* Counterweight for second hand */
+  .hand-second::before {
+    content: '';
+    position: absolute;
+    width: clamp(2px, 0.5vw, 4px);
+    height: 18%;
+    background: #e63946;
+    bottom: -5%;
+    left: 50%;
+    transform: translateX(-50%);
+    border-radius: 2px;
+  }
+
+  @keyframes rotateSec {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+  }
+
+  /* Center cap */
+  .center-cap {
+    position: absolute;
+    width: clamp(8px, 2vw, 14px);
+    height: clamp(8px, 2vw, 14px);
+    background: radial-gradient(circle at 40% 40%, #888, #222);
+    border-radius: 50%;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 10;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.5);
+  }
+
+  .center-cap::after {
+    content: '';
+    position: absolute;
+    width: 35%;
+    height: 35%;
+    background: #ccc;
+    border-radius: 50%;
+    top: 20%;
+    left: 20%;
+  }
+</style>
+</head>
+<body>
+
+<div class="clock-container">
+  <div class="clock">
+    <div class="clock-face" id="clockFace">
+
+      <!-- Tick marks and numbers placed via JS for responsiveness -->
+      <div class="ticks" id="ticks"></div>
+      <div class="hands">
+        <div class="hand hand-hour" id="hourHand"></div>
+        <div class="hand hand-minute" id="minuteHand"></div>
+        <div class="hand hand-second" id="secondHand"></div>
+      </div>
+      <div class="center-cap"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const face = document.getElementById('clockFace');
+  const ticksContainer = document.getElementById('ticks');
+
+  function buildClock() {
+    ticksContainer.innerHTML = '';
+
+    const size = face.offsetWidth;
+    const cx = size / 2;
+    const cy = size / 2;
+    const radius = size / 2;
+
+    const numRadius   = radius * 0.78;
+    const majorInner  = radius * 0.85;
+    const majorOuter  = radius * 0.95;
+    const minorInner  = radius * 0.90;
+    const minorOuter  = radius * 0.95;
+
+    const numbers = [12,1,2,3,4,5,6,7,8,9,10,11];
+    const fontSize = size * 0.09;
+
+    for (let i = 0; i < 60; i++) {
+      const angle = (i * 6 - 90) * Math.PI / 180;
+      const isMajor = i % 5 === 0;
+
+      const innerR = isMajor ? majorInner : minorInner;
+      const outerR = isMajor ? majorOuter : minorOuter;
+
+      const x1 = cx + innerR * Math.cos(angle);
+      const y1 = cy + innerR * Math.sin(angle);
+      const x2 = cx + outerR * Math.cos(angle);
+      const y2 = cy + outerR * Math.sin(angle);
+
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('style', `position:absolute;top:0;left:0;width:100%;height:100%;overflow:visible;`);
+
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', x1);
+      line.setAttribute('y1', y1);
+      line.setAttribute('x2', x2);
+      line.setAttribute('y2', y2);
+      line.setAttribute('stroke', isMajor ? '#222' : '#aaa');
+      line.setAttribute('stroke-width', isMajor ? Math.max(2, size * 0.012) : Math.max(1, size * 0.005));
+      line.setAttribute('stroke-linecap', 'round');
+
+      svg.appendChild(line);
+
+      if (isMajor) {
+        const numIndex = i / 5;
+        const nx = cx + numRadius * Math.cos(angle);
+        const ny = cy + numRadius * Math.sin(angle);
+
+        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('x', nx);
+        text.setAttribute('y', ny);
+        text.setAttribute('text-anchor', 'middle');
+        text.setAttribute('dominant-baseline', 'central');
+        text.setAttribute('font-size', fontSize);
+        text.setAttribute('font-weight', 'bold');
+        text.setAttribute('font-family', 'Georgia, serif');
+        text.setAttribute('fill', '#1a1a1a');
+        text.textContent = numbers[numIndex];
+        svg.appendChild(text);
+      }
+
+      ticksContainer.appendChild(svg);
+    }
+
+    // Set second hand initial rotation to current seconds
+    const now = new Date();
+    const secs = now.getSeconds();
+    const secondHand = document.getElementById('secondHand');
+    secondHand.style.animationDelay = `-${secs}s`;
+  }
+
+  buildClock();
+  window.addEventListener('resize', buildClock);
+</script>
+
+</body>
+</html>
